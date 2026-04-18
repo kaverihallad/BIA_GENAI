@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session 12: RAG Pipeline Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const SAMPLE_TEXT = `India Tourism Guide
+
+Goa is famous for its beautiful beaches and vibrant nightlife. The state has over 40 beaches, from the popular Baga and Calangute to the quieter Palolem and Agonda. Goa is also known for its Portuguese heritage, visible in its churches and colonial architecture.
+
+Kerala, known as God's Own Country, offers lush green backwaters, tea plantations in Munnar, and pristine beaches in Kovalam. The state is also famous for Ayurvedic treatments and traditional Kathakali dance performances.
+
+Rajasthan is the land of kings, with magnificent forts and palaces. Jaipur, the Pink City, houses the iconic Hawa Mahal and Amber Fort. Udaipur, the City of Lakes, is known for its romantic setting and the stunning Lake Palace.
+
+Varanasi is one of the oldest continuously inhabited cities in the world. The holy city on the banks of the Ganges is known for its spiritual significance, ancient temples, and the mesmerizing Ganga Aarti ceremony performed every evening.
+
+The Himalayas in northern India offer breathtaking mountain landscapes. From the hill stations of Shimla and Manali to the trekking routes in Uttarakhand, the region attracts adventure seekers and nature lovers throughout the year.`;
+
+    // Chunk splitting logic
+    const chunkText = (text, chunkSize, overlap) => {
+      const chunks = [];
+      let start = 0;
+
+      const splitRecursive = (text, depth) => {
+        if (text.length <= chunkSize) return [text];
+
+        const separators = ['\n\n', '\n', ' ', ''];
+        const sep = separators[Math.min(depth, 3)];
+
+        if (!sep) return [text];
+
+        const parts = text.split(sep);
+        const result = [];
+        let current = '';
+
+        for (let part of parts) {
+          if ((current + (current ? sep : '') + part).length <= chunkSize) {
+            current += (current ? sep : '') + part;
+          } else {
+            if (current) result.push(current);
+            current = part;
+          }
+        }
+        if (current) result.push(current);
+
+        return result.length > 1 ? result : splitRecursive(text, depth + 1);
+      };
+
+      const baseParts = splitRecursive(text, 0);
+      let currentPos = 0;
+
+      for (let part of baseParts) {
+        chunks.push({
+          text: part,
+          startIdx: currentPos,
+          endIdx: currentPos + part.length
+        });
+        currentPos += part.length;
+      }
+
+      return chunks;
+    };
+
+    // Tab 1: Chunking Lab
+    const ChunkingLab = () => {
+      const [chunkSize, setChunkSize] = useState(200);
+      const [overlap, setOverlap] = useState(20);
+
+      const chunks = useMemo(() => chunkText(SAMPLE_TEXT, chunkSize, overlap), [chunkSize, overlap]);
+      const avgSize = chunks.length > 0 ? Math.round(chunks.reduce((s, c) => s + c.text.length, 0) / chunks.length) : 0;
+
+      const colors = ['bg-teal-700', 'bg-blue-700', 'bg-teal-600', 'bg-blue-600'];
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <label className="block text-sm font-semibold mb-2">Chunk Size: {chunkSize} chars</label>
+            <input type="range" min="100" max="500" step="50" value={chunkSize} onChange={(e) => setChunkSize(Number(e.target.value))} className="w-full" />
+
+            <label className="block text-sm font-semibold mt-4 mb-2">Overlap: {overlap} chars</label>
+            <input type="range" min="0" max="100" step="10" value={overlap} onChange={(e) => setOverlap(Number(e.target.value))} className="w-full" />
+          </div>
+
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <p className="text-sm mb-2"><strong>Total Chunks:</strong> {chunks.length}</p>
+            <p className="text-sm mb-2"><strong>Avg Chunk Size:</strong> {avgSize} chars</p>
+            <p className="text-sm"><strong>Compression:</strong> {Math.round((chunks.length * chunkSize / SAMPLE_TEXT.length) * 100)}%</p>
+          </div>
+
+          <div className="space-y-2">
+            {chunks.map((chunk, idx) => (
+              <div key={idx} className={`${colors[idx % 4]} p-4 rounded text-sm max-h-24 overflow-y-auto`}>
+                <strong className="block mb-1">Chunk {idx + 1}</strong>
+                {chunk.text.substring(0, 150)}{chunk.text.length > 150 ? '...' : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // Tab 2: RAG Pipeline
+    const RAGPipeline = () => {
+      const [step, setStep] = useState(0);
+      const question = 'What are the best beaches in India?';
+      const mockVector = [0.23, -0.15, 0.89, 0.42, -0.31, 0.67].map((v, i) => (v + (Math.random() - 0.5) * 0.1).toFixed(2));
+      const chunks = chunkText(SAMPLE_TEXT, 200, 20);
+      const topChunks = chunks.slice(0, 3).map((c, i) => ({ text: c.text, score: (0.95 - i * 0.15).toFixed(2) }));
+      const answers = [
+        'Question typed',
+        'Vector created: ' + mockVector.join(', ') + '...',
+        'Searching vector store...',
+        'Retrieved top-3 relevant chunks',
+        'Building augmented prompt',
+        'Generated: Goa has 40+ beautiful beaches including Baga, Calangute, Palolem. Kerala offers pristine Kovalam beach and backwaters. The best time to visit is Oct-Mar for optimal weather.'
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="flex gap-2 flex-wrap">
+            {['Q', 'Embed', 'Search', 'Retrieve', 'Prompt', 'Answer'].map((label, idx) => (
+              <div key={idx} className={`px-4 py-2 rounded font-semibold text-sm ${step >= idx ? 'bg-teal-600' : 'bg-gray-700'}`}>{label}</div>
+            ))}
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg min-h-64">
+            <h3 className="font-bold mb-4">Step {step + 1}: {['Question', 'Embedding', 'Vector Search', 'Retrieval', 'Prompt Building', 'Answer Generation'][step]}</h3>
+            <p className="text-gray-300 text-sm whitespace-pre-wrap">{answers[step]}</p>
+          </div>
+
+          <div className="flex gap-4">
+            <button onClick={() => setStep(Math.max(0, step - 1))} className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600" disabled={step === 0}>Previous</button>
+            <button onClick={() => setStep(Math.min(5, step + 1))} className="px-4 py-2 bg-teal-600 rounded hover:bg-teal-500" disabled={step === 5}>Next</button>
+          </div>
+        </div>
+      );
+    };
+
+    // Tab 3: Router Demo
+    const RouterDemo = () => {
+      const [selectedQuery, setSelectedQuery] = useState(0);
+      const [showing, setShowing] = useState(null);
+
+      const queries = [
+        { text: 'What beaches are in Goa?', path: 'Retrieval' },
+        { text: 'What is the capital of France?', path: 'Direct' },
+        { text: 'Tell me about Kerala backwaters', path: 'Retrieval' },
+        { text: 'What is 15 × 23?', path: 'Direct' },
+        { text: 'Which temples should I visit in Varanasi?', path: 'Retrieval' },
+        { text: 'Explain what RAG stands for', path: 'Direct' },
+        { text: 'Best time to visit Rajasthan?', path: 'Retrieval' },
+        { text: 'What is photosynthesis?', path: 'Direct' }
+      ];
+
+      const query = queries[selectedQuery];
+      const isRetrieval = query.path === 'Retrieval';
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="font-bold mb-4">Sample Queries</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {queries.map((q, idx) => (
+                <button key={idx} onClick={() => { setSelectedQuery(idx); setShowing(null); }} className={`w-full text-left p-3 rounded text-sm ${selectedQuery === idx ? 'bg-teal-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                  {q.text}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <h3 className="font-bold mb-2">Query</h3>
+              <p className="text-sm text-gray-300">{query.text}</p>
+            </div>
+
+            <button onClick={() => setShowing('classify')} className="w-full px-4 py-2 bg-teal-600 rounded hover:bg-teal-500 font-semibold">Classify Query</button>
+
+            {showing && (
+              <>
+                <div className={`p-4 rounded-lg font-semibold text-center ${isRetrieval ? 'bg-teal-700' : 'bg-blue-700'}`}>
+                  Route: {query.path} Path
+                </div>
+
+                <div className="bg-gray-800 p-4 rounded-lg text-sm space-y-2">
+                  {isRetrieval ? (
+                    <>
+                      <p>1. Embed query to vector</p>
+                      <p>2. Search vector store</p>
+                      <p>3. Retrieve relevant chunks</p>
+                      <p>4. Augment prompt with context</p>
+                      <p>5. Generate answer with RAG</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>1. Send query to LLM</p>
+                      <p>2. Generate answer directly</p>
+                      <p>3. No retrieval needed</p>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // Tab 4: Eval Metrics
+    const EvalMetrics = () => {
+      const [relevant, setRelevant] = useState(new Set([0, 2, 4, 6]));
+      const [k, setK] = useState(5);
+      const [retrieved] = useState([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+      const retrievedK = retrieved.slice(0, k);
+      const tp = retrievedK.filter(i => relevant.has(i)).length;
+      const fp = retrievedK.filter(i => !relevant.has(i)).length;
+      const fn = Array.from(relevant).filter(i => !retrievedK.includes(i)).length;
+
+      const precision = k > 0 ? (tp / k * 100).toFixed(1) : 0;
+      const recall = relevant.size > 0 ? (tp / relevant.size * 100).toFixed(1) : 0;
+      const f1 = precision && recall ? (2 * (precision / 100 * recall / 100) / (precision / 100 + recall / 100) * 100).toFixed(1) : 0;
+
+      const toggleRelevant = (idx) => {
+        const newSet = new Set(relevant);
+        if (newSet.has(idx)) newSet.delete(idx);
+        else newSet.add(idx);
+        setRelevant(newSet);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <label className="block text-sm font-semibold mb-2">K (top-k to evaluate): {k}</label>
+            <input type="range" min="1" max="10" value={k} onChange={(e) => setK(Number(e.target.value))} className="w-full" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <p className="text-xs text-gray-400 mb-2">PRECISION@{k}</p>
+              <p className="text-2xl font-bold text-teal-400">{precision}%</p>
+              <p className="text-xs text-gray-400 mt-1">{tp}/{k}</p>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <p className="text-xs text-gray-400 mb-2">RECALL@{k}</p>
+              <p className="text-2xl font-bold text-teal-400">{recall}%</p>
+              <p className="text-xs text-gray-400 mt-1">{tp}/{relevant.size}</p>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <p className="text-xs text-gray-400 mb-2">F1@{k}</p>
+              <p className="text-2xl font-bold text-teal-400">{f1}%</p>
+              <p className="text-xs text-gray-400 mt-1">Harmonic Mean</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="font-bold mb-4">Mark Relevant Documents (Ground Truth)</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {[...Array(10)].map((_, idx) => (
+                <button key={idx} onClick={() => toggleRelevant(idx)} className={`p-3 rounded font-semibold text-sm ${relevant.has(idx) ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                  Doc {idx + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="font-bold mb-4">Retrieved Documents (Top-{k})</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {retrievedK.map((idx) => (
+                <div key={idx} className={`p-3 rounded font-semibold text-sm text-center ${relevant.has(idx) ? 'bg-green-600' : 'bg-red-600'}`}>
+                  Doc {idx + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-800 p-4 rounded-lg text-xs space-y-1 text-gray-300">
+            <p><span className="inline-block w-3 h-3 bg-green-600 mr-2"></span>TP (Relevant & Retrieved)</p>
+            <p><span className="inline-block w-3 h-3 bg-red-600 mr-2"></span>FP (Not Relevant but Retrieved)</p>
+            <p><span className="inline-block w-3 h-3 bg-gray-600 mr-2"></span>FN (Relevant but Not Retrieved)</p>
+          </div>
+        </div>
+      );
+    };
+
+    // Main App
+    const App = () => {
+      const [activeTab, setActiveTab] = useState(0);
+      const tabs = [
+        { name: 'Chunking Lab', component: ChunkingLab },
+        { name: 'RAG Pipeline', component: RAGPipeline },
+        { name: 'Router Demo', component: RouterDemo },
+        { name: 'Eval Metrics', component: EvalMetrics }
+      ];
+      const ActiveComponent = tabs[activeTab].component;
+
+      return (
+        <div className="min-h-screen bg-gray-900 text-white p-6">
+          <div className="max-w-6xl mx-auto">
+            <header className="mb-8">
+              <h1 className="text-4xl font-bold text-teal-400 mb-2">Session 12: Text-RAG Pipeline</h1>
+              <p className="text-gray-400">Interactive Explorer - Chunking, Retrieval, Routing & Evaluation</p>
+            </header>
+
+            <div className="flex gap-2 mb-8 flex-wrap">
+              {tabs.map((tab, idx) => (
+                <button key={idx} onClick={() => setActiveTab(idx)} className={`px-6 py-3 rounded-lg font-semibold transition-colors ${activeTab === idx ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
+                  {tab.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-8">
+              <ActiveComponent />
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
