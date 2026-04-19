@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session 13: Multimodal RAG Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .tab-active { background-color: rgb(20, 184, 166); color: white; }
+    .tab-inactive { background-color: rgb(55, 65, 81); color: rgb(209, 213, 219); }
+    .card-glow { box-shadow: 0 0 20px rgba(20, 184, 166, 0.3); }
+    .arrow-down { width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 12px solid rgb(20, 184, 166); margin: 8px auto; }
+    .pulse-animation { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .highlight { background-color: rgba(20, 184, 166, 0.2); border-color: rgb(20, 184, 166); }
+    .embedding-dot { width: 20px; height: 20px; border-radius: 50%; background-color: rgb(59, 130, 246); }
+    .embedding-square { width: 20px; height: 20px; background-color: rgb(34, 197, 94); }
+    .embedding-triangle { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 18px solid rgb(168, 85, 247); }
+    .embedding-diamond { width: 20px; height: 20px; transform: rotate(45deg); background-color: rgb(249, 115, 22); }
+  </style>
+</head>
+<body class="bg-gray-900 text-white">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function Tab1_Pipeline() {
+      const [step, setStep] = useState(0);
+      const steps = [
+        {
+          title: 'Raw Images',
+          desc: 'Different image types awaiting processing',
+          items: [
+            { emoji: '📊', name: 'Chart' },
+            { emoji: '📸', name: 'Photo' },
+            { emoji: '🗓️', name: 'Diagram' },
+            { emoji: '💻', name: 'Screenshot' },
+            { emoji: '📄', name: 'Document' }
+          ]
+        },
+        {
+          title: 'Describe with LLM',
+          desc: 'Gemini generates text descriptions',
+          items: [
+            { emoji: '📊', name: 'Chart', desc: 'Shows Q3 sales growth of 15%...' },
+            { emoji: '📸', name: 'Photo', desc: 'Beach scene with palm trees...' },
+            { emoji: '🗓️', name: 'Diagram', desc: 'System architecture with 3 layers...' },
+            { emoji: '💻', name: 'Screenshot', desc: 'Dashboard displaying metrics...' }
+          ]
+        },
+        {
+          title: 'Embed Descriptions',
+          desc: 'Convert text to vectors',
+          items: [
+            { emoji: '📊', name: 'Chart', vec: '[0.23, -0.15, 0.42, ...]' },
+            { emoji: '📸', name: 'Photo', vec: '[-0.31, 0.08, -0.19, ...]' },
+            { emoji: '🗓️', name: 'Diagram', vec: '[0.15, 0.32, 0.28, ...]' },
+            { emoji: '💻', name: 'Screenshot', vec: '[0.09, -0.22, 0.41, ...]' }
+          ]
+        },
+        {
+          title: 'Store in Vector DB',
+          desc: 'Vectors indexed in ChromaDB',
+          content: 'db_vectors'
+        },
+        {
+          title: 'Query & Retrieve',
+          desc: 'Find matching images and generate answer',
+          content: 'query_result'
+        }
+      ];
+
+      const current = steps[step];
+
+      return (
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2">{current.title}</h2>
+            <p className="text-teal-400 mb-8">{current.desc}</p>
+
+            <div className="bg-gray-800 rounded-lg p-8 mb-8 min-h-80">
+              {step === 0 && (
+                <div className="grid grid-cols-5 gap-4">
+                  {current.items.map((item, i) => (
+                    <div key={i} className="bg-gray-700 rounded p-4 text-center">
+                      <div className="text-4xl mb-2">{item.emoji}</div>
+                      <p className="text-sm">{item.name}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step === 1 && (
+                <div className="space-y-4">
+                  {current.items.map((item, i) => (
+                    <div key={i} className="flex items-start gap-4 bg-gray-700 rounded p-4">
+                      <span className="text-3xl">{item.emoji}</span>
+                      <div>
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="text-sm text-gray-300 italic">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step === 2 && (
+                <div className="space-y-4">
+                  {current.items.map((item, i) => (
+                    <div key={i} className="flex items-center gap-4 bg-gray-700 rounded p-4">
+                      <span className="text-2xl">{item.emoji}</span>
+                      <div className="flex-1">
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="font-mono text-sm text-teal-400">{item.vec}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step === 3 && (
+                <div className="text-center">
+                  <div className="inline-block bg-gradient-to-r from-teal-600 to-teal-500 rounded p-8 mb-6">
+                    <p className="text-2xl font-bold mb-2">ChromaDB</p>
+                    <p className="text-sm">Vector Store (Indexed)</p>
+                  </div>
+                  <div className="text-gray-300">
+                    <p>✓ 5 vector embeddings stored</p>
+                    <p>✓ HNSW index for fast retrieval</p>
+                    <p>✓ Metadata linked to originals</p>
+                  </div>
+                </div>
+              )}
+              {step === 4 && (
+                <div>
+                  <div className="bg-gray-700 rounded p-4 mb-4">
+                    <p className="font-semibold mb-2">User Query:</p>
+                    <p className="text-teal-400">"What does the chart show?"</p>
+                  </div>
+                  <div className="border-t-2 border-teal-500 pt-4">
+                    <p className="font-semibold mb-2">Retrieved Match:</p>
+                    <div className="bg-teal-900 bg-opacity-30 rounded p-4 border border-teal-500">
+                      <p className="text-2xl mb-2">📊</p>
+                      <p className="text-sm">The chart displays quarterly sales data with a 15% growth in Q3 compared to Q2...</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setStep(Math.max(0, step - 1))}
+                className="bg-teal-600 hover:bg-teal-700 px-6 py-2 rounded font-semibold disabled:opacity-50"
+                disabled={step === 0}
+              >
+                Previous
+              </button>
+              <p className="text-teal-400">Step {step + 1} of {steps.length}</p>
+              <button
+                onClick={() => setStep(Math.min(steps.length - 1, step + 1))}
+                className="bg-teal-600 hover:bg-teal-700 px-6 py-2 rounded font-semibold disabled:opacity-50"
+                disabled={step === steps.length - 1}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function Tab2_SourceMixer() {
+      const [selectedQuery, setSelectedQuery] = useState(0);
+
+      const queries = [
+        { text: 'What beaches are in Goa?', route: 'text' },
+        { text: 'What does the population chart show?', route: 'image' },
+        { text: 'What was discussed at minute 5 of the lecture?', route: 'video' },
+        { text: 'Describe the architecture diagram', route: 'image' },
+        { text: "What are Kerala's main attractions?", route: 'text' },
+        { text: 'Summarize the key points from the tutorial video', route: 'video' },
+        { text: 'What trend does the sales graph indicate?', route: 'image' },
+        { text: 'How do I get from Mumbai to Goa?', route: 'text' }
+      ];
+
+      const sources = {
+        text: [
+          { title: 'Goa Travel Guide', icon: '📄', content: 'Beaches: Baga, Calangute, Palolem...' },
+          { title: 'India Tourism', icon: '📑', content: 'Kerala: Tea plantations, backwaters...' },
+          { title: 'Route Planner', icon: '🗺️', content: 'Mumbai to Goa: 600km via NH48...' }
+        ],
+        image: [
+          { title: 'Population Chart 2024', icon: '📊', content: 'Growth rate: 8.2% YoY' },
+          { title: 'System Architecture', icon: '🗓️', content: 'Three-tier architecture diagram' },
+          { title: 'Sales Graph', icon: '📈', content: 'Q3 growth: +15%' }
+        ],
+        video: [
+          { title: 'ML Lecture - Part 1', icon: '🎥', content: 'Neural networks explained (5:00)' },
+          { title: 'Python Tutorial', icon: '📹', content: 'Advanced concepts covered' },
+          { title: 'Data Science Course', icon: '🎬', content: 'Key principles summarized' }
+        ]
+      };
+
+      const current = queries[selectedQuery];
+      const relevantSource = sources[current.route];
+
+      const answers = {
+        text: 'Based on travel documents: Goa has beautiful beaches including Baga Beach, known for water sports, and Palolem Beach for peaceful sunsets.',
+        image: 'The population chart shows a steady growth trend with peaks in urban centers. Population increased by 8.2% year-over-year.',
+        video: 'At minute 5 of the lecture, the professor explained how neural networks use backpropagation to adjust weights during training.'
+      };
+
+      return (
+        <div className="p-8">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2">Multi-Source RAG Demo</h2>
+            <p className="text-teal-400 mb-8">See how the system routes queries to the right knowledge source</p>
+
+            <div className="bg-gray-800 rounded-lg p-6 mb-8">
+              <label className="block text-sm font-semibold mb-3">Select a Query:</label>
+              <select
+                value={selectedQuery}
+                onChange={(e) => setSelectedQuery(parseInt(e.target.value))}
+                className="w-full bg-gray-700 border border-teal-500 rounded px-4 py-2 text-white"
+              >
+                {queries.map((q, i) => (
+                  <option key={i} value={i}>{q.text}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 mb-8">
+              <div className={('bg-gray-800 rounded-lg p-6 border-2 transition', current.route === 'text' ? 'border-blue-500 bg-blue-900 bg-opacity-20' : 'border-gray-700')}>
+                <p className="text-xl font-bold mb-4 text-blue-400">📄 Text Docs</p>
+                <div className="space-y-3">
+                  {sources.text.map((item, i) => (
+                    <div key={i} className={'bg-gray-700 rounded p-3', current.route === 'text' && i === 0 ? 'border-2 border-blue-400' : '')}>
+                      <p className="font-semibold text-sm">{item.title}</p>
+                      <p className="text-xs text-gray-300">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className={('bg-gray-800 rounded-lg p-6 border-2 transition', current.route === 'image' ? 'border-green-500 bg-green-900 bg-opacity-20' : 'border-gray-700')}>
+                <p className="text-xl font-bold mb-4 text-green-400">🖼️ Images/Charts</p>
+                <div className="space-y-3">
+                  {sources.image.map((item, i) => (
+                    <div key={i} className={'bg-gray-700 rounded p-3', current.route === 'image' && i === 0 ? 'border-2 border-green-400' : ''}>
+                      <p className="font-semibold text-sm">{item.title}</p>
+                      <p className="text-xs text-gray-300">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className={('bg-gray-800 rounded-lg p-6 border-2 transition', current.route === 'video' ? 'border-purple-500 bg-purple-900 bg-opacity-20' : 'border-gray-700')}>
+                <p className="text-xl font-bold mb-4 text-purple-400">🎥 YouTube Videos</p>
+                <div className="space-y-3">
+                  {sources.video.map((item, i) => (
+                    <div key={i} className={'bg-gray-700 rounded p-3', current.route === 'video' && i === 0 ? 'border-2 border-purple-400' : ''}>
+                      <p className="font-semibold text-sm">{item.title}</p>
+                      <p className="text-xs text-gray-300">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-teal-900 to-gray-800 rounded-lg p-6 border border-teal-500">
+              <p className="font-semibold mb-2 text-teal-400">AI-Generated Response:</p>
+              <p className="text-gray-100">{answers[current.route]}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function Tab3_Comparison() {
+      const [scenario, setScenario] = useState(0);
+
+      const scenarios = [
+        {
+          question: 'What does the quarterly sales chart show?',
+          textResult: { success: false, answer: 'No relevant documents found.' },
+          multiResult: { success: true, answer: 'The chart shows 15% growth in Q3, with sales reaching $2.5M.' }
+        },
+        {
+          question: 'What food is popular in Kerala?',
+          textResult: { success: true, answer: 'Rice, coconut-based curries, seafood, and spices like cardamom.' },
+          multiResult: { success: true, answer: 'Rice, coconut-based curries, seafood, and spices like cardamom.' }
+        },
+        {
+          question: 'What did the professor explain about neural networks?',
+          textResult: { success: false, answer: 'No relevant text documents found.' },
+          multiResult: { success: true, answer: 'Prof explained backpropagation: how networks adjust weights iteratively to minimize loss.' }
+        },
+        {
+          question: 'Describe the temple architecture in the photo.',
+          textResult: { success: false, answer: 'No description available.' },
+          multiResult: { success: true, answer: 'Southern Indian temple: gopuram towers, intricate stone carvings, central sanctum.' }
+        }
+      ];
+
+      const current = scenarios[scenario];
+
+      return (
+        <div className="p-8">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2">Text vs Multimodal RAG</h2>
+            <p className="text-teal-400 mb-8">Compare how each approach handles different query types</p>
+
+            <div className="bg-gray-800 rounded-lg p-6 mb-8">
+              <label className="block text-sm font-semibold mb-3">Test Scenario:</label>
+              <select
+                value={scenario}
+                onChange={(e) => setScenario(parseInt(e.target.value))}
+                className="w-full bg-gray-700 border border-teal-500 rounded px-4 py-2 text-white"
+              >
+                {scenarios.map((s, i) => (
+                  <option key={i} value={i}>Scenario {i + 1}: {s.question}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 mb-8">
+              <div className="bg-gray-800 rounded-lg p-6 border-2 border-red-600">
+                <h3 className="text-xl font-bold mb-4 text-red-400">Text-Only RAG</h3>
+                <div className="bg-gray-700 rounded p-4 mb-4">
+                  <p className="text-sm font-semibold mb-2">Query:</p>
+                  <p className="text-teal-300">{current.question}</p>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="text-xs font-semibold text-gray-400">Available Sources:</p>
+                  <div className="bg-gray-600 rounded p-3">
+                    <p className="text-sm">📄 Text documents only</p>
+                    <p className="text-xs text-gray-300 mt-1">Images: Cannot search (not in text form)</p>
+                    <p className="text-xs text-gray-300">Videos: Transcripts not available</p>
+                  </div>
+                </div>
+                <div className={('rounded p-4', current.textResult.success ? 'bg-green-900 bg-opacity-30 border border-green-500' : 'bg-red-900 bg-opacity-30 border border-red-500')}>
+                  <p className="text-xs font-semibold mb-1">{current.textResult.success ? '✓ Success' : '✗ Failed'}</p>
+                  <p className="text-sm">{current.textResult.answer}</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-6 border-2 border-green-600">
+                <h3 className="text-xl font-bold mb-4 text-green-400">Multimodal RAG</h3>
+                <div className="bg-gray-700 rounded p-4 mb-4">
+                  <p className="text-sm font-semibold mb-2">Query:</p>
+                  <p className="text-teal-300">{current.question}</p>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="text-xs font-semibold text-gray-400">Available Sources:</p>
+                  <div className="bg-gray-600 rounded p-3">
+                    <p className="text-sm">📄 Text documents</p>
+                    <p className="text-sm">📊 Image descriptions (via LLM)</p>
+                    <p className="text-sm">🎥 Video transcripts</p>
+                  </div>
+                </div>
+                <div className="rounded p-4 bg-green-900 bg-opacity-30 border border-green-500">
+                  <p className="text-xs font-semibold mb-1">✓ Success</p>
+                  <p className="text-sm">{current.multiResult.answer}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-teal-900 bg-opacity-30 border border-teal-500 rounded-lg p-6">
+              <p className="font-semibold text-teal-400 mb-2">Key Insight:</p>
+              <p>Multimodal RAG excels when answers require visual or temporal information (charts, diagrams, videos). Text-only RAG fails silently when this context is needed.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function Tab4_EmbeddingEvolution() {
+      const [hoveredItem, setHoveredItem] = useState(null);
+
+      const embeddings_old = [
+        { id: 1, type: 'text', label: 'Text A', x: 20, y: 30 },
+        { id: 2, type: 'text', label: 'Text B', x: 40, y: 50 },
+        { id: 3, type: 'text', label: 'Text C', x: 35, y: 70 }
+      ];
+
+      const embeddings_new = [
+        { id: 1, type: 'text', label: 'Text', x: 25, y: 35, icon: '●' },
+        { id: 2, type: 'text', label: 'Text', x: 45, y: 55, icon: '●' },
+        { id: 3, type: 'image', label: 'Image', x: 50, y: 40, icon: '■' },
+        { id: 4, type: 'video', label: 'Video', x: 35, y: 65, icon: '▲' },
+        { id: 5, type: 'audio', label: 'Audio', x: 30, y: 25, icon: '◆' }
+      ];
+
+      return (
+        <div className="p-8">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2">Embedding Evolution</h2>
+            <p className="text-teal-400 mb-8">From separate spaces to a unified multimodal embedding space</p>
+
+            <div className="grid grid-cols-2 gap-8 mb-8">
+              <div>
+                <h3 className="text-xl font-bold mb-4 text-orange-400">Today: Separate Spaces</h3>
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <div className="bg-gray-700 rounded-lg h-64 mb-4 relative border-2 border-orange-600 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-sm font-semibold mb-2">Text Embedding Space</p>
+                      {embeddings_old.map((item) => (
+                        <div
+                          key={item.id}
+                          className="inline-block mx-2"
+                          style={{ opacity: hoveredItem === item.id ? 1 : 0.5 }}
+                        >
+                          <span className="text-xl cursor-pointer" onMouseEnter={() => setHoveredItem(item.id)} onMouseLeave={() => setHoveredItem(null)}>●</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-4">
+                    <p className="text-sm font-semibold text-red-400 mb-2">Problem:</p>
+                    <p className="text-xs">Images and videos cannot be directly embedded. Need workaround: describe with LLM first.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold mb-4 text-purple-400">Future: Unified Space</h3>
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <div className="bg-gray-700 rounded-lg h-64 mb-4 relative border-2 border-purple-600 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-xs font-semibold mb-4">Gemini Embedding 2 Space</p>
+                      <div style={{ position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {embeddings_new.map((item) => (
+                          <div
+                            key={item.id}
+                            style={{
+                              position: 'absolute',
+                              left: item.x + '%',
+                              top: item.y + '%',
+                              opacity: hoveredItem === item.id ? 1 : 0.6,
+                              cursor: 'pointer',
+                              fontSize: '20px'
+                            }}
+                            onMouseEnter={() => setHoveredItem(item.id)}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            title={item.label}
+                          >
+                            {item.icon}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-900 bg-opacity-30 border border-green-500 rounded p-4">
+                    <p className="text-sm font-semibold text-green-400 mb-2">Benefit:</p>
+                    <p className="text-xs">Text, images, video, and audio all in one space. Query directly finds relevant items.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6 border-2 border-teal-500">
+              <h3 className="text-xl font-bold mb-4 text-teal-400">Gemini Embedding 2 Specs</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-gray-700 rounded p-4">
+                  <p className="text-xs text-gray-400">Dimensions</p>
+                  <p className="text-2xl font-bold text-teal-400">3072</p>
+                </div>
+                <div className="bg-gray-700 rounded p-4">
+                  <p className="text-xs text-gray-400">Cost</p>
+                  <p className="text-lg font-bold text-teal-400">$0.20/1M tokens</p>
+                </div>
+                <div className="bg-gray-700 rounded p-4">
+                  <p className="text-xs text-gray-400">Modalities</p>
+                  <p className="text-lg font-bold text-teal-400">5 types</p>
+                </div>
+                <div className="bg-gray-700 rounded p-4">
+                  <p className="text-xs text-gray-400">Languages</p>
+                  <p className="text-lg font-bold text-teal-400">100+</p>
+                </div>
+                <div className="bg-gray-700 rounded p-4 md:col-span-2">
+                  <p className="text-xs text-gray-400">Supported Types</p>
+                  <p className="text-sm font-bold text-teal-400">Text, Image, Video, Audio, Code</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [activeTab, setActiveTab] = useState(0);
+
+      const tabs = [
+        { label: 'Multimodal Pipeline', component: Tab1_Pipeline },
+        { label: 'Source Mixer', component: Tab2_SourceMixer },
+        { label: 'Modality Comparison', component: Tab3_Comparison },
+        { label: 'Embedding Evolution', component: Tab4_EmbeddingEvolution }
+      ];
+
+      const ActiveComponent = tabs[activeTab].component;
+
+      return (
+        <div className="min-h-screen bg-gray-900">
+          <div className="border-b border-gray-700 bg-gray-800">
+            <div className="max-w-7xl mx-auto px-8 py-4">
+              <h1 className="text-3xl font-bold text-teal-400 mb-6">Session 13: Multimodal RAG Explorer</h1>
+              <div className="flex gap-2 flex-wrap">
+                {tabs.map((tab, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveTab(i)}
+                    className={('px-4 py-2 rounded font-semibold transition', activeTab === i ? 'tab-active' : 'tab-inactive')}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto">
+            <ActiveComponent />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
