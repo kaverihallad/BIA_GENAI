@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Study Assistant - Architecture</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --dark-navy: #1A2332;
+            --teal: #0D9488;
+            --light-teal: #14B8A6;
+            --bg: #F0FDFA;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--dark-navy);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--light-teal);
+            flex-wrap: wrap;
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--dark-navy);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            color: var(--teal);
+            border-bottom-color: var(--teal);
+        }
+        .tab-button:hover {
+            color: var(--light-teal);
+        }
+        .module {
+            padding: 1rem;
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        .module:hover {
+            background-color: var(--bg);
+            border-color: var(--teal);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+            transform: translateY(-2px);
+        }
+        .module-label {
+            font-weight: 600;
+            color: var(--teal);
+            margin-bottom: 0.25rem;
+            font-family: 'Courier New', monospace;
+        }
+        .module-desc {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--teal), var(--light-teal));
+            transition: width 0.3s ease;
+        }
+        .todo-item {
+            padding: 0.75rem;
+            background: white;
+            border-left: 4px solid var(--light-teal);
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .todo-item:hover {
+            background-color: var(--bg);
+            border-left-color: var(--teal);
+        }
+        .todo-item.completed {
+            opacity: 0.6;
+        }
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+        }
+        .todo-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--teal);
+        }
+        .phase-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--teal);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--light-teal);
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+        .comparison-card {
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        .comparison-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--teal);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .comparison-feature {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background-color: var(--bg);
+            border-radius: 4px;
+        }
+        .comparison-label {
+            font-weight: 600;
+            color: var(--dark-navy);
+            font-size: 0.9rem;
+        }
+        .comparison-value {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+        .shared-backend {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(13, 148, 136, 0.1), rgba(20, 184, 166, 0.1));
+            border-left: 4px solid var(--teal);
+            border-radius: 8px;
+        }
+        .shared-backend-title {
+            font-weight: 700;
+            color: var(--teal);
+            margin-bottom: 0.5rem;
+        }
+        .concept-map {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        .concept-card {
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+        .concept-file {
+            font-weight: 700;
+            color: var(--teal);
+            margin-bottom: 0.75rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+        .concept-session {
+            background-color: var(--bg);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #666;
+            margin: 0.25rem 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--teal);
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .arch-diagram {
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        .layer-box {
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            margin: 0.5rem;
+            display: inline-block;
+            font-weight: 600;
+            color: var(--teal);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .layer-label {
+            font-weight: 700;
+            color: var(--teal);
+            font-size: 0.85rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .layer-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .stat-box {
+            background: white;
+            border: 2px solid var(--light-teal);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--teal);
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 1rem;
+            }
+            .tab-button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function ArchitectureApp() {
+            const [activeTab, setActiveTab] = useState('architecture');
+            const [selectedModule, setSelectedModule] = useState(null);
+            const [completedTodos, setCompletedTodos] = useState({});
+
+            const toggleTodo = (todoId) => {
+                setCompletedTodos(prev => ({
+                    ...prev,
+                    [todoId]: !prev[todoId]
+                }));
+            };
+
+            const todos = [
+                { id: 1, phase: 1, text: 'Create loader.py - implement PDF text extraction' },
+                { id: 2, phase: 1, text: 'Implement document chunking with overlap' },
+                { id: 3, phase: 1, text: 'Add metadata preservation in chunks' },
+                { id: 4, phase: 2, text: 'Create vectorstore.py with ChromaDB' },
+                { id: 5, phase: 2, text: 'Implement vector persistence and recovery' },
+                { id: 6, phase: 2, text: 'Add vector metadata filtering' },
+                { id: 7, phase: 3, text: 'Create retriever.py with LCEL pipeline' },
+                { id: 8, phase: 3, text: 'Implement context window management' },
+                { id: 9, phase: 3, text: 'Add relevance reranking' },
+                { id: 10, phase: 4, text: 'Create tools.py with summarize tool' },
+                { id: 11, phase: 4, text: 'Implement flashcard generation tool' },
+                { id: 12, phase: 4, text: 'Create quiz generation tool' },
+                { id: 13, phase: 5, text: 'Create evaluator.py with scoring metrics' },
+                { id: 14, phase: 5, text: 'Implement answer relevance evaluation' },
+                { id: 15, phase: 5, text: 'Add self-reflection mechanism' },
+                { id: 16, phase: 5, text: 'Create evaluation dashboard output' },
+                { id: 17, phase: 6, text: 'Create router.py for query classification' },
+                { id: 18, phase: 6, text: 'Implement intent-based routing logic' },
+                { id: 19, phase: 6, text: 'Create agent.py with ReAct pattern' },
+                { id: 20, phase: 6, text: 'Implement multi-tool orchestration' },
+                { id: 21, phase: 6, text: 'Add memory and conversation tracking' },
+                { id: 22, phase: 7, text: 'Create app.py - Initialize Streamlit app' },
+                { id: 23, phase: 7, text: 'Build file upload interface' },
+                { id: 24, phase: 7, text: 'Create chat sidebar and message display' },
+                { id: 25, phase: 7, text: 'Implement query input and streaming response' },
+                { id: 26, phase: 7, text: 'Add tool selection UI' },
+                { id: 27, phase: 7, text: 'Implement evaluation display' },
+                { id: 28, phase: 7, text: 'Add styling and dark mode' }
+            ];
+
+            const completedCount = Object.values(completedTodos).filter(Boolean).length;
+            const progressPercent = (completedCount / todos.length) * 100;
+
+            const moduleDetails = {
+                'loader': {
+                    name: 'loader.py',
+                    desc: 'Document Loading & Parsing',
+                    details: 'Extract text from PDFs, implement intelligent chunking with overlap, preserve metadata for retrieval'
+                },
+                'vectorstore': {
+                    name: 'vectorstore.py',
+                    desc: 'Vector Store Management',
+                    details: 'Initialize ChromaDB, embed documents, handle persistence, enable metadata filtering'
+                },
+                'retriever': {
+                    name: 'retriever.py',
+                    desc: 'RAG Pipeline Orchestration',
+                    details: 'Build LCEL pipeline, manage context windows, implement relevance reranking'
+                },
+                'tools': {
+                    name: 'tools.py',
+                    desc: 'Custom Learning Tools',
+                    details: 'Summarize documents, generate flashcards, create quiz questions'
+                },
+                'evaluator': {
+                    name: 'evaluator.py',
+                    desc: 'Evaluation & Metrics',
+                    details: 'Score answers, measure relevance, implement self-reflection on responses'
+                },
+                'router': {
+                    name: 'router.py',
+                    desc: 'Query Router & Classifier',
+                    details: 'Classify user queries, route to appropriate tools based on intent'
+                },
+                'agent': {
+                    name: 'agent.py',
+                    desc: 'ReAct Agent Framework',
+                    details: 'Orchestrate multi-tool workflows, manage conversation memory, implement reasoning loop'
+                },
+                'app': {
+                    name: 'app.py',
+                    desc: 'Streamlit Web UI',
+                    details: 'Web-based interface with file uploads, chat display, sidebar controls, real-time streaming'
+                },
+                'main': {
+                    name: 'main.py',
+                    desc: 'CLI Entry Point',
+                    details: 'Command-line interface with colorized output, perfect for automation and development'
+                }
+            };
+
+            const conceptMap = [
+                { file: 'loader.py', sessions: 'Session 12: Text Chunking' },
+                { file: 'vectorstore.py', sessions: 'Sessions 10-11: Vector Search & DB' },
+                { file: 'retriever.py', sessions: 'Session 12: RAG Pipeline + LCEL' },
+                { file: 'tools.py', sessions: 'Session 9: Tool Design' },
+                { file: 'evaluator.py', sessions: 'Sessions 8+12: Self-Reflection & Metrics' },
+                { file: 'router.py', sessions: 'Sessions 9+12: Query Routing' },
+                { file: 'agent.py', sessions: 'Session 9: ReAct Agent' },
+                { file: 'app.py', sessions: 'Phase 7: Streamlit UI' },
+                { file: 'main.py', sessions: 'All Sessions: CLI Integration' }
+            ];
+
+            return (
+                <div className="container">
+                    <div style={{ marginBottom: '2rem' }}>
+                        <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--dark-navy)', marginBottom: '0.5rem' }}>
+                            Smart Study Assistant
+                        </h1>
+                        <p style={{ color: '#666', fontSize: '1rem' }}>Interactive Architecture & Progress Tracker</p>
+                    </div>
+
+                    <div className="tabs">
+                        <button
+                            className={`tab-button ${activeTab === 'architecture' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('architecture')}
+                        >
+                            Architecture Map
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === 'concepts' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('concepts')}
+                        >
+                            Concept Map
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === 'progress' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('progress')}
+                        >
+                            Build Progress
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === 'comparison' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('comparison')}
+                        >
+                            CLI vs Streamlit
+                        </button>
+                    </div>
+
+                    {activeTab === 'architecture' && (
+                        <div>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teal)', marginBottom: '1.5rem' }}>
+                                System Architecture
+                            </h2>
+
+                            <div className="arch-diagram">
+                                <div className="layer-label">Entry Points (User Facing)</div>
+                                <div className="layer-items">
+                                    <div className="layer-box" style={{ backgroundColor: '#fef3c7', borderColor: '#fbbf24', color: '#d97706' }}>🌐 app.py (Streamlit)</div>
+                                    <div className="layer-box" style={{ backgroundColor: '#dbeafe', borderColor: '#3b82f6', color: '#1e40af' }}>⌨️ main.py (CLI)</div>
+                                </div>
+
+                                <div className="layer-label">Intelligence Layer</div>
+                                <div className="layer-items">
+                                    <div className="layer-box">router.py</div>
+                                    <div className="layer-box">evaluator.py</div>
+                                    <div className="layer-box">agent.py</div>
+                                </div>
+
+                                <div className="layer-label">Tools Layer</div>
+                                <div className="layer-items">
+                                    <div className="layer-box">tools.py</div>
+                                </div>
+
+                                <div className="layer-label">Pipeline Layer (RAG)</div>
+                                <div className="layer-items">
+                                    <div className="layer-box">retriever.py</div>
+                                    <div className="layer-box">vectorstore.py</div>
+                                    <div className="layer-box">loader.py</div>
+                                </div>
+
+                                <div className="layer-label">Data Layer</div>
+                                <div className="layer-items">
+                                    <div className="layer-box" style={{ backgroundColor: '#f3e8ff', borderColor: '#a855f7', color: '#6b21a8' }}>sample_notes.txt</div>
+                                </div>
+                            </div>
+
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--teal)', marginTop: '2rem', marginBottom: '1rem' }}>
+                                Module Details (Click to Learn More)
+                            </h3>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                                {Object.entries(moduleDetails).map(([key, module]) => (
+                                    <div
+                                        key={key}
+                                        className="module"
+                                        onClick={() => setSelectedModule(selectedModule === key ? null : key)}
+                                        style={{
+                                            backgroundColor: selectedModule === key ? 'var(--bg)' : 'white',
+                                            borderColor: selectedModule === key ? 'var(--teal)' : 'var(--light-teal)'
+                                        }}
+                                    >
+                                        <div className="module-label">{module.name}</div>
+                                        <div className="module-desc">{module.desc}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {selectedModule && (
+                                <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: 'white', border: '2px solid var(--teal)', borderRadius: '8px' }}>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--teal)', marginBottom: '1rem' }}>
+                                        {moduleDetails[selectedModule]?.name}
+                                    </h3>
+                                    <p style={{ color: '#666', marginBottom: '1rem', lineHeight: '1.6' }}>
+                                        {moduleDetails[selectedModule]?.details}
+                                    </p>
+                                    <button
+                                        onClick={() => setSelectedModule(null)}
+                                        style={{
+                                            padding: '0.5rem 1rem',
+                                            backgroundColor: 'var(--teal)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            fontWeight: '600'
+                                        }}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'concepts' && (
+                        <div>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teal)', marginBottom: '1.5rem' }}>
+                                Concept Mapping: Course to Code
+                            </h2>
+                            <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+                                Each file in the project is built from concepts taught in the BIA GenAI course sessions.
+                            </p>
+                            <div className="concept-map">
+                                {conceptMap.map((concept, idx) => (
+                                    <div key={idx} className="concept-card">
+                                        <div className="concept-file">{concept.file}</div>
+                                        <div className="concept-session">{concept.sessions}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f0fdf4', borderLeft: '4px solid #22c55e', borderRadius: '8px' }}>
+                                <div style={{ fontWeight: '700', color: '#16a34a', marginBottom: '0.5rem' }}>Learning Path Recommendation</div>
+                                <p style={{ color: '#666', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                                    Start with Sessions 10-12 to understand vector databases, chunking strategies, and RAG fundamentals. Then explore Sessions 8-9 for evaluation metrics and agent/tool design patterns. Finally, Phase 7 integrates everything into a user-friendly Streamlit web interface.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'progress' && (
+                        <div>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teal)', marginBottom: '1.5rem' }}>
+                                Build Progress Tracker
+                            </h2>
+
+                            <div className="stats-grid">
+                                <div className="stat-box">
+                                    <div className="stat-number">{completedCount}</div>
+                                    <div className="stat-label">Completed</div>
+                                </div>
+                                <div className="stat-box">
+                                    <div className="stat-number">{todos.length}</div>
+                                    <div className="stat-label">Total TODOs</div>
+                                </div>
+                                <div className="stat-box">
+                                    <div className="stat-number">{Math.round(progressPercent)}%</div>
+                                    <div className="stat-label">Progress</div>
+                                </div>
+                                <div className="stat-box">
+                                    <div className="stat-number">7</div>
+                                    <div className="stat-label">Phases</div>
+                                </div>
+                            </div>
+
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${progressPercent}%` }}></div>
+                            </div>
+
+                            {[1, 2, 3, 4, 5, 6, 7].map(phase => {
+                                const phaseTodos = todos.filter(t => t.phase === phase);
+                                const phaseNames = {
+                                    1: 'Phase 1: Document Loading',
+                                    2: 'Phase 2: Vector Store',
+                                    3: 'Phase 3: RAG Chain',
+                                    4: 'Phase 4: Custom Tools',
+                                    5: 'Phase 5: Evaluation',
+                                    6: 'Phase 6: Router + Agent',
+                                    7: 'Phase 7: Streamlit UI (NEW)'
+                                };
+
+                                const phaseDone = phaseTodos.filter(t => completedTodos[t.id]).length;
+                                const phaseProgress = Math.round((phaseDone / phaseTodos.length) * 100);
+
+                                return (
+                                    <div key={phase}>
+                                        <div className="phase-title">
+                                            {phaseNames[phase]}
+                                            <span style={{ float: 'right', fontSize: '0.9rem', color: '#666', fontWeight: '400' }}>
+                                                {phaseDone}/{phaseTodos.length}
+                                            </span>
+                                        </div>
+                                        {phaseTodos.map(todo => (
+                                            <div
+                                                key={todo.id}
+                                                className={`todo-item ${completedTodos[todo.id] ? 'completed' : ''}`}
+                                                onClick={() => toggleTodo(todo.id)}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="todo-checkbox"
+                                                    checked={completedTodos[todo.id] || false}
+                                                    onChange={() => {}}
+                                                />
+                                                <span className="todo-text">{todo.text}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {activeTab === 'comparison' && (
+                        <div>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--teal)', marginBottom: '1.5rem' }}>
+                                CLI vs Streamlit: Two Interfaces, Same Engine
+                            </h2>
+                            <p style={{ color: '#666', marginBottom: '2rem' }}>
+                                Both entry points (main.py and app.py) use the exact same backend modules. Pick your interface based on your use case.
+                            </p>
+
+                            <div className="comparison-grid">
+                                <div className="comparison-card">
+                                    <div className="comparison-header">
+                                        <span>⌨️</span> CLI: main.py
+                                    </div>
+                                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1.5rem', fontWeight: '500' }}>
+                                        Terminal-based interface
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">How to Use</div>
+                                        <div className="comparison-value">Run from terminal with command-line arguments</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Input</div>
+                                        <div className="comparison-value">CLI arguments, text prompts at command line</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Output</div>
+                                        <div className="comparison-value">Colored terminal text using colorama</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">File Upload</div>
+                                        <div className="comparison-value">Pass file paths as arguments</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Best For</div>
+                                        <div className="comparison-value">Developers, automation, scripts, batch processing</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Deploy To</div>
+                                        <div className="comparison-value">Servers, CI/CD pipelines, cron jobs</div>
+                                    </div>
+                                </div>
+
+                                <div className="comparison-card">
+                                    <div className="comparison-header">
+                                        <span>🌐</span> Web: app.py
+                                    </div>
+                                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1.5rem', fontWeight: '500' }}>
+                                        Streamlit web application
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">How to Use</div>
+                                        <div className="comparison-value">Open in web browser, interact with visual UI</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Input</div>
+                                        <div className="comparison-value">File upload widget, sidebar controls, chat input</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Output</div>
+                                        <div className="comparison-value">Chat bubbles, formatted cards, interactive metrics</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">File Upload</div>
+                                        <div className="comparison-value">Drag-and-drop or click file input widget</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Best For</div>
+                                        <div className="comparison-value">Students, end users, quick exploration, demos</div>
+                                    </div>
+
+                                    <div className="comparison-feature">
+                                        <div className="comparison-label">Deploy To</div>
+                                        <div className="comparison-value">Streamlit Cloud, Docker, web servers</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="shared-backend">
+                                <div className="shared-backend-title">🔗 Shared Architecture: Single Backend, Multiple Frontends</div>
+                                <p style={{ color: '#666', fontSize: '0.95rem', margin: '1rem 0' }}>
+                                    The core intelligence layer is independent of the UI. Both main.py and app.py import and use the same backend modules:
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+                                    {['loader.py', 'vectorstore.py', 'retriever.py', 'tools.py', 'router.py', 'agent.py', 'evaluator.py'].map(module => (
+                                        <div key={module} style={{
+                                            padding: '0.75rem',
+                                            backgroundColor: 'white',
+                                            border: '2px solid var(--light-teal)',
+                                            borderRadius: '6px',
+                                            fontFamily: "'Courier New', monospace",
+                                            fontSize: '0.85rem',
+                                            fontWeight: '600',
+                                            color: 'var(--teal)',
+                                            textAlign: 'center'
+                                        }}>
+                                            {module}
+                                        </div>
+                                    ))}
+                                </div>
+                                <p style={{ color: '#666', fontSize: '0.9rem', marginTop: '1.5rem', lineHeight: '1.6' }}>
+                                    This means you can switch between interfaces without changing any business logic, evaluation metrics, or tool implementations. The architecture is truly modular.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ArchitectureApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
