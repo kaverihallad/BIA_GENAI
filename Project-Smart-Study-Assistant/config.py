@@ -1,12 +1,13 @@
 """Configuration for the Smart Study Assistant."""
 import os
+from dotenv import load_dotenv
 
-# API Key — set your Google API key here
-os.environ.setdefault("GOOGLE_API_KEY", "your-api-key-here")
+# Load environment variables from .env file
+load_dotenv()
 
 # Model settings
 LLM_MODEL = "gemini-2.5-flash"
-EMBEDDING_MODEL = "models/embedding-001"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
 LLM_TEMPERATURE = 0
 
 # Chunking settings

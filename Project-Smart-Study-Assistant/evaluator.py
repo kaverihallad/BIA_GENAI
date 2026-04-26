@@ -6,20 +6,24 @@ def critique_response(question: str, answer: str) -> str:
     """Ask the LLM to critique its own answer (Session 8: Self-Reflection)."""
     llm = get_llm()
 
-    # TODO 13: Create a prompt that asks the LLM to critique the answer
-    # Check for: accuracy, completeness, clarity
-    # Return the critique as a string
-    # Hint: llm.invoke("Critique this answer for accuracy and completeness: ...")
-    pass
+    prompt = (
+        f"Critique this answer for accuracy, completeness, and clarity.\n"
+        f"Question: {question}\n\nAnswer: {answer}\n\n"
+        f"Provide specific feedback on what's missing or unclear."
+    )
+    return llm.invoke(prompt).content
 
 
 def refine_response(question: str, answer: str, critique: str) -> str:
     """Refine the answer based on critique (Session 8: Self-Refine pattern)."""
     llm = get_llm()
 
-    # TODO 14: Create a prompt that asks the LLM to improve the answer
-    # based on the critique. Return the improved answer.
-    pass
+    prompt = (
+        f"Improve this answer based on the critique.\n"
+        f"Question: {question}\n\nOriginal answer: {answer}\n\nCritique: {critique}\n\n"
+        f"Provide an improved answer that addresses the critique."
+    )
+    return llm.invoke(prompt).content
 
 
 def self_refine(question: str, answer: str, max_rounds: int = 2) -> str:
@@ -37,17 +41,17 @@ def self_refine(question: str, answer: str, max_rounds: int = 2) -> str:
 
 def precision_at_k(retrieved: list, relevant: list, k: int) -> float:
     """Calculate Precision@K (Session 12: Eval metrics)."""
-    # TODO 15: Implement precision@k
-    # retrieved_k = retrieved[:k]
-    # Count how many of retrieved_k are in relevant
-    # Return count / k
-    pass
+    retrieved_k = retrieved[:k]
+    count = sum(1 for doc in retrieved_k if doc in relevant)
+    return count / k if k > 0 else 0
 
 
 def recall_at_k(retrieved: list, relevant: list, k: int) -> float:
     """Calculate Recall@K."""
-    # TODO 16: Implement recall@k
-    pass
+    retrieved_k = retrieved[:k]
+    count = sum(1 for doc in retrieved_k if doc in relevant)
+    total = len(relevant)
+    return count / total if total > 0 else 0
 
 
 def f1_at_k(retrieved: list, relevant: list, k: int) -> float:

@@ -8,14 +8,21 @@ def classify_query(question: str) -> str:
     """Classify a user query into a category."""
     llm = get_llm()
 
-    # TODO 17: Ask the LLM to classify the question into one of ROUTE_CATEGORIES
-    # study_question = needs RAG retrieval from notes
-    # summarize = wants a topic summary
-    # flashcards = wants flashcards generated
-    # quiz = wants a quiz
-    # general = general question, no retrieval needed
-    # Return ONLY the category name
-    pass
+    prompt = (
+        f"Classify this question into EXACTLY ONE of these categories: "
+        f"study_question, summarize, flashcards, quiz, general.\n\n"
+        f"Categories:\n"
+        f"- study_question: needs information from study notes\n"
+        f"- summarize: user wants a topic summary\n"
+        f"- flashcards: user wants flashcards generated\n"
+        f"- quiz: user wants to be quizzed\n"
+        f"- general: general question that doesn't need notes\n\n"
+        f"Question: {question}\n\n"
+        f"Reply with ONLY the category name in lowercase, nothing else."
+    )
+    result = llm.invoke(prompt).content.strip().lower()
+    # Validate — fall back to study_question if LLM returns unexpected text
+    return result if result in ROUTE_CATEGORIES else "study_question"
 
 
 def route_query(question: str, rag_chain, tools: dict) -> str:
@@ -23,10 +30,16 @@ def route_query(question: str, rag_chain, tools: dict) -> str:
     category = classify_query(question)
     print(f"  Routed to: {category}")
 
-    # TODO 18: Based on category, call the right handler:
-    # "study_question" -> use rag_chain.invoke(question)
-    # "summarize" -> use tools["summarize"].invoke(question)
-    # "flashcards" -> use tools["flashcards"].invoke(question)
-    # "quiz" -> use tools["quiz"].invoke(question)
-    # "general" -> use get_llm().invoke(question).content
-    pass
+    if category == "study_question":
+        return rag_chain.invoke(question)
+    elif category == "summarize":
+        result = tools["summarize"].invoke(question)
+        return result.content if hasattr(result, "content") else str(result)
+    elif category == "flashcards":
+        result = tools["flashcards"].invoke(question)
+        return result.content if hasattr(result, "content") else str(result)
+    elif category == "quiz":
+        result = tools["quiz"].invoke(question)
+        return result.content if hasattr(result, "content") else str(result)
+    else:  # general
+        return get_llm().invoke(question).content

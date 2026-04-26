@@ -9,7 +9,9 @@ from retriever import get_llm
 @tool
 def summarize_topic(topic: str) -> str:
     """Create a concise summary of a study topic."""
-    pass
+    llm = get_llm()
+    prompt = f"Provide a concise 3-4 bullet point summary of this topic: {topic}. Focus on key concepts."
+    return llm.invoke(prompt).content
 
 
 # TODO 11: Create a @tool called generate_flashcards that takes content (str)
@@ -17,7 +19,9 @@ def summarize_topic(topic: str) -> str:
 @tool
 def generate_flashcards(content: str) -> str:
     """Generate study flashcards (Q&A pairs) from content."""
-    pass
+    llm = get_llm()
+    prompt = f"Create 5 study flashcards (Q&A pairs) from this content: {content}. Format each as 'Q: [question]\nA: [answer]'"
+    return llm.invoke(prompt).content
 
 
 # TODO 12: Create a @tool called quiz_me that takes a topic (str)
@@ -25,7 +29,9 @@ def generate_flashcards(content: str) -> str:
 @tool
 def quiz_me(topic: str) -> str:
     """Generate a multiple-choice quiz on a topic."""
-    pass
+    llm = get_llm()
+    prompt = f"Create a 3-question multiple choice quiz on this topic: {topic}. For each question, provide 4 options (A, B, C, D) and indicate the correct answer."
+    return llm.invoke(prompt).content
 
 
 def get_all_tools():

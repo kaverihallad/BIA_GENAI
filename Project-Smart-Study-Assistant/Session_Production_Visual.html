@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture, Production & Interview Prep - BIA Smart Study Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            --dark-navy: #1A2332;
+            --teal: #0D9488;
+            --light-teal: #14B8A6;
+            --bg: #F0FDFA;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--dark-navy);
+        }
+
+        .tab-active {
+            border-bottom: 3px solid var(--teal);
+            color: var(--teal);
+        }
+
+        .flow-node {
+            transition: all 0.3s ease;
+        }
+
+        .flow-node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+        }
+
+        .flow-arrow {
+            stroke: var(--teal);
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+
+        .data-packet {
+            animation: flow 3s linear infinite;
+        }
+
+        @keyframes flow {
+            0% { offset-distance: 0%; }
+            100% { offset-distance: 100%; }
+        }
+
+        .checklist-item {
+            border-left: 4px solid #E5E7EB;
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item.checked {
+            border-left-color: var(--teal);
+            background-color: rgba(13, 148, 136, 0.05);
+        }
+
+        .flashcard {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+
+        .flashcard-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .flashcard.flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flashcard-front, .flashcard-back {
+            backface-visibility: hidden;
+        }
+
+        .flashcard-back {
+            transform: rotateY(180deg);
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--teal) 0%, var(--light-teal) 100%);
+            border-radius: 10px;
+            overflow: hidden;
+            height: 8px;
+        }
+
+        .typing-effect {
+            border-right: 2px solid var(--teal);
+            animation: blink 0.7s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { border-right-color: var(--teal); }
+            50%, 100% { border-right-color: transparent; }
+        }
+
+        .tooltip-trigger {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted var(--teal);
+        }
+
+        .tooltip {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .tooltip-trigger:hover .tooltip {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .use-case-mapping {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .mapping-column {
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ========================
+        // TAB 1: Data Flow Visualizer
+        // ========================
+        function DataFlowVisualizer() {
+            const [isAnimating, setIsAnimating] = useState(false);
+            const [selectedNode, setSelectedNode] = useState(null);
+            const [hoveredNode, setHoveredNode] = useState(null);
+
+            const flowNodes = [
+                {
+                    id: 'input',
+                    label: 'User Query',
+                    description: 'User input: "Explain gradient descent from my notes"',
+                    file: 'N/A',
+                    function: 'User input',
+                    code: 'query = "Explain gradient descent from my notes"',
+                    x: 50,
+                    y: 50,
+                    errors: []
+                },
+                {
+                    id: 'router',
+                    label: 'Router (Classify)',
+                    description: 'Determine query type and intent',
+                    file: 'router.py',
+                    function: 'route_query()',
+                    code: 'intent = classifier.predict(query)\nreturn QUERY_TYPES.get(intent)',
+                    x: 50,
+                    y: 150,
+                    errors: ['Classification error', 'Invalid intent']
+                },
+                {
+                    id: 'embeddings',
+                    label: 'Embeddings (Vectorize)',
+                    description: 'Convert query text to vector representation',
+                    file: 'embeddings.py',
+                    function: 'embed_query()',
+                    code: 'embedding = embedding_model.encode(query)\nreturn embedding.toarray()',
+                    x: 50,
+                    y: 250,
+                    errors: ['Model not loaded', 'Embedding dimension mismatch']
+                },
+                {
+                    id: 'chromadb',
+                    label: 'ChromaDB (Search)',
+                    description: 'Query vector database for similar documents',
+                    file: 'loader.py',
+                    function: 'query_documents()',
+                    code: 'results = chromadb.query(\n  query_embeddings=[embedding],\n  n_results=5\n)',
+                    x: 50,
+                    y: 350,
+                    errors: ['DB connection failed', 'No similar docs found']
+                },
+                {
+                    id: 'retriever',
+                    label: 'Retriever (Get Chunks)',
+                    description: 'Extract relevant text chunks from search results',
+                    file: 'retriever.py',
+                    function: 'retrieve_context()',
+                    code: 'chunks = [doc["text"] for doc in results]\ncontext = "\\n\\n".join(chunks)',
+                    x: 50,
+                    y: 450,
+                    errors: ['Empty chunks', 'Low relevance score']
+                },
+                {
+                    id: 'prompt',
+                    label: 'Prompt Template (Inject)',
+                    description: 'Create prompt with context and query',
+                    file: 'prompt_template.py',
+                    function: 'format_prompt()',
+                    code: 'final_prompt = TEMPLATE.format(\n  context=context,\n  query=query\n)',
+                    x: 50,
+                    y: 550,
+                    errors: ['Template error', 'Missing variables']
+                },
+                {
+                    id: 'llm',
+                    label: 'LLM (Generate)',
+                    description: 'Generate response using language model',
+                    file: 'llm.py',
+                    function: 'generate_response()',
+                    code: 'response = llm.generate(\n  prompt=final_prompt,\n  temperature=0.7\n)',
+                    x: 50,
+                    y: 650,
+                    errors: ['API timeout', 'Rate limit exceeded']
+                },
+                {
+                    id: 'evaluator',
+                    label: 'Evaluator (Critique)',
+                    description: 'Evaluate response quality and refine if needed',
+                    file: 'evaluator.py',
+                    function: 'evaluate_response()',
+                    code: 'score = evaluator.score(response, context)\nif score < 0.7:\n  response = refine(response)',
+                    x: 50,
+                    y: 750,
+                    errors: ['Evaluation failed', 'Refinement loop']
+                },
+                {
+                    id: 'output',
+                    label: 'Response',
+                    description: 'Final refined response to user',
+                    file: 'N/A',
+                    function: 'Output',
+                    code: 'return final_response',
+                    x: 50,
+                    y: 850,
+                    errors: []
+                }
+            ];
+
+            const runQuery = () => {
+                setIsAnimating(true);
+                setTimeout(() => setIsAnimating(false), 4000);
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-dark-navy">Data Flow Visualizer</h2>
+                        <button
+                            onClick={runQuery}
+                            disabled={isAnimating}
+                            className="px-6 py-2 bg-teal text-white rounded-lg hover:bg-light-teal disabled:opacity-50 transition"
+                        >
+                            {isAnimating ? '▶ Running...' : '▶ Run Query'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Flow Diagram */}
+                        <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-teal border-opacity-20">
+                            <svg width="100%" height="900" viewBox="0 0 600 900" className="mb-4">
+                                <defs>
+                                    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                        <polygon points="0 0, 10 3, 0 6" fill="#0D9488" />
+                                    </marker>
+                                </defs>
+
+                                {/* Connection lines */}
+                                {flowNodes.slice(0, -1).map((node, idx) => {
+                                    const nextNode = flowNodes[idx + 1];
+                                    return (
+                                        <g key={`line-${idx}`}>
+                                            <line
+                                                x1="75"
+                                                y1={node.y + 40}
+                                                x2="75"
+                                                y2={nextNode.y - 30}
+                                                className="flow-arrow"
+                                            />
+                                        </g>
+                                    );
+                                })}
+
+                                {/* Data packet animation */}
+                                {isAnimating && (
+                                    <circle
+                                        cx="75"
+                                        cy="100"
+                                        r="8"
+                                        fill="#0D9488"
+                                        className="data-packet"
+                                        style={{
+                                            offsetPath: 'path("M 75 100 L 75 900")',
+                                            offsetDistance: '0%'
+                                        }}
+                                    />
+                                )}
+
+                                {/* Nodes */}
+                                {flowNodes.map((node) => (
+                                    <g
+                                        key={node.id}
+                                        className="flow-node"
+                                        onMouseEnter={() => setHoveredNode(node.id)}
+                                        onMouseLeave={() => setHoveredNode(null)}
+                                        onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
+                                    >
+                                        <rect
+                                            x={node.x - 30}
+                                            y={node.y - 20}
+                                            width="180"
+                                            height="40"
+                                            rx="8"
+                                            fill={selectedNode === node.id ? '#0D9488' : (hoveredNode === node.id ? '#14B8A6' : '#E0F2F1')}
+                                            stroke="#0D9488"
+                                            strokeWidth="2"
+                                        />
+                                        <text
+                                            x={node.x + 60}
+                                            y={node.y + 5}
+                                            textAnchor="middle"
+                                            fill={selectedNode === node.id ? 'white' : '#1A2332'}
+                                            fontSize="12"
+                                            fontWeight="500"
+                                        >
+                                            {node.label}
+                                        </text>
+                                    </g>
+                                ))}
+                            </svg>
+                        </div>
+
+                        {/* Details Panel */}
+                        <div className="bg-white rounded-lg p-6 border border-teal border-opacity-20 h-fit sticky top-6">
+                            <h3 className="font-bold text-teal mb-4">Step Details</h3>
+                            {selectedNode ? (
+                                (() => {
+                                    const node = flowNodes.find(n => n.id === selectedNode);
+                                    return (
+                                        <div className="space-y-4 text-sm">
+                                            <div>
+                                                <p className="font-semibold text-dark-navy">{node.label}</p>
+                                                <p className="text-gray-600 mt-1">{node.description}</p>
+                                            </div>
+                                            <div className="border-t pt-3">
+                                                <p className="font-semibold text-dark-navy mb-1">File: <span className="text-teal">{node.file}</span></p>
+                                                <p className="font-semibold text-dark-navy mb-1">Function: <code className="bg-gray-100 px-2 py-1 rounded text-xs">{node.function}</code></p>
+                                            </div>
+                                            <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                                <p className="font-semibold text-xs text-gray-700 mb-2">Code Pattern:</p>
+                                                <code className="text-xs text-gray-800 block font-mono whitespace-pre-wrap">{node.code}</code>
+                                            </div>
+                                            {node.errors.length > 0 && (
+                                                <div className="bg-red-50 p-3 rounded border-l-4 border-red-500">
+                                                    <p className="font-semibold text-xs text-red-700 mb-2">⚠️ Potential Errors:</p>
+                                                    <ul className="text-xs text-red-700 space-y-1">
+                                                        {node.errors.map((err, idx) => (
+                                                            <li key={idx}>• {err}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()
+                            ) : (
+                                <p className="text-gray-500 text-sm">Click a node to see details</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ========================
+        // TAB 2: Use Case Mapper
+        // ========================
+        function UseCaseMapper() {
+            const [selectedUseCase, setSelectedUseCase] = useState('customer-support');
+
+            const useCases = {
+                'customer-support': {
+                    name: 'Customer Support',
+                    mappings: [
+                        {
+                            original: 'loader.py',
+                            originalDesc: 'Loads student notes',
+                            adapted: 'Loads product docs, FAQs, ticket history (PDF/CSV)',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'tools.py',
+                            originalDesc: 'study_guide(), search_notes()',
+                            adapted: 'escalate_ticket(), check_order(), create_refund()',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'router.py',
+                            originalDesc: 'classification, explanation, quiz',
+                            adapted: 'billing, technical, general, escalation',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'retriever.py',
+                            originalDesc: 'RAG on notes',
+                            adapted: 'RAG on support docs, same architecture',
+                            status: 'unchanged'
+                        },
+                        {
+                            original: 'prompt_template.py',
+                            originalDesc: 'Study assistant prompt',
+                            adapted: '"You are a support agent with 24/7 availability..."',
+                            status: 'customized'
+                        }
+                    ]
+                },
+                'legal-analyzer': {
+                    name: 'Legal Document Analyzer',
+                    mappings: [
+                        {
+                            original: 'loader.py',
+                            originalDesc: 'Loads student notes',
+                            adapted: 'Loads contracts, case law, precedents (PDF/DOCX)',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'tools.py',
+                            originalDesc: 'study_guide(), search_notes()',
+                            adapted: 'flag_clause(), suggest_edit(), generate_summary()',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'evaluator.py',
+                            originalDesc: 'Quality check response',
+                            adapted: 'Ensure legal accuracy, flag liability risks',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'retriever.py',
+                            originalDesc: 'RAG on notes',
+                            adapted: 'RAG on legal docs, same RAG flow',
+                            status: 'unchanged'
+                        },
+                        {
+                            original: 'llm.py',
+                            originalDesc: 'GPT generation',
+                            adapted: 'Same LLM call with legal-specific system prompt',
+                            status: 'unchanged'
+                        }
+                    ]
+                },
+                'company-wiki': {
+                    name: 'Company Wiki Assistant',
+                    mappings: [
+                        {
+                            original: 'loader.py',
+                            originalDesc: 'Loads student notes',
+                            adapted: 'Loads company docs, policies, wiki pages, Notion/Confluence exports',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'embeddings.py',
+                            originalDesc: 'Vectorize queries',
+                            adapted: 'Same embedding model, works on any text',
+                            status: 'unchanged'
+                        },
+                        {
+                            original: 'router.py',
+                            originalDesc: 'Classification by intent',
+                            adapted: 'Route by department: HR, IT, Finance, General',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'tools.py',
+                            originalDesc: 'study_guide(), quiz()',
+                            adapted: 'link_to_policy(), request_access(), notify_owner()',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'retriever.py',
+                            originalDesc: 'RAG on notes',
+                            adapted: 'RAG architecture unchanged, retrieves company knowledge',
+                            status: 'unchanged'
+                        }
+                    ]
+                },
+                'healthcare': {
+                    name: 'Healthcare Patient Assistant',
+                    mappings: [
+                        {
+                            original: 'loader.py',
+                            originalDesc: 'Loads student notes',
+                            adapted: 'Loads patient records, treatment history, medical guidelines (HIPAA-compliant)',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'evaluator.py',
+                            originalDesc: 'Quality check response',
+                            adapted: 'Ensure medical accuracy, flag urgent conditions, require human review',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'router.py',
+                            originalDesc: 'Intent classification',
+                            adapted: 'Triage: urgent, appointment, symptoms, medication, general',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'tools.py',
+                            originalDesc: 'study_guide(), search()',
+                            adapted: 'schedule_appointment(), notify_doctor(), provide_wellness_tips()',
+                            status: 'customized'
+                        },
+                        {
+                            original: 'llm.py + prompt_template.py',
+                            originalDesc: 'LLM generation',
+                            adapted: 'Same LLM with strict medical-safety system prompt and disclaimers',
+                            status: 'customized'
+                        }
+                    ]
+                }
+            };
+
+            const currentCase = useCases[selectedUseCase];
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-dark-navy mb-4">Use Case Mapper</h2>
+                        <p className="text-gray-600 mb-4">Same architecture, different domains. Select a use case to see how the Smart Study Assistant adapts.</p>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {Object.entries(useCases).map(([key, value]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setSelectedUseCase(key)}
+                                    className={`p-3 rounded-lg font-semibold transition ${
+                                        selectedUseCase === key
+                                            ? 'bg-teal text-white'
+                                            : 'bg-white border border-teal border-opacity-30 text-dark-navy hover:bg-teal hover:bg-opacity-10'
+                                    }`}
+                                >
+                                    {value.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="use-case-mapping">
+                        <div className="mapping-column border-l-4 border-teal">
+                            <h3 className="font-bold text-teal mb-4">Smart Study Assistant (Original)</h3>
+                            <div className="space-y-3 text-sm">
+                                {currentCase.mappings.map((mapping, idx) => (
+                                    <div key={idx} className="p-3 bg-blue-50 rounded">
+                                        <p className="font-semibold text-dark-navy">{mapping.original}</p>
+                                        <p className="text-gray-600 text-xs mt-1">{mapping.originalDesc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mapping-column border-l-4 border-light-teal">
+                            <h3 className="font-bold text-light-teal mb-4">{currentCase.name}</h3>
+                            <div className="space-y-3 text-sm">
+                                {currentCase.mappings.map((mapping, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`p-3 rounded transition ${
+                                            mapping.status === 'unchanged'
+                                                ? 'bg-green-50 border-l-2 border-green-500'
+                                                : 'bg-orange-50 border-l-2 border-orange-500'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="font-semibold text-dark-navy">{mapping.adapted}</p>
+                                                <p className="text-xs text-gray-600 mt-1">
+                                                    {mapping.status === 'unchanged' ? '✓ Reusable' : '⚙️ Customized'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-teal bg-opacity-10 border border-teal border-opacity-30 p-4 rounded-lg">
+                        <p className="text-sm font-semibold text-teal mb-2">💡 Key Insight</p>
+                        <p className="text-sm text-dark-navy">
+                            The core architecture (loader → embeddings → ChromaDB → retriever → LLM → evaluator) is <strong>domain-agnostic</strong>.
+                            You're only changing: the data source, tool definitions, routing intents, and system prompts. This is what makes the
+                            Smart Study Assistant a <strong>template</strong> for any RAG application.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ========================
+        // TAB 3: Production Checklist
+        // ========================
+        function ProductionChecklist() {
+            const [checkedItems, setCheckedItems] = useState(new Set());
+
+            const categories = {
+                security: {
+                    name: '🔒 Security',
+                    icon: '🔒',
+                    items: [
+                        {
+                            id: 'gitignore',
+                            task: 'Add .gitignore and exclude .env files',
+                            why: 'Prevents accidental exposure of API keys and secrets to version control',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'env-vars',
+                            task: 'Use environment variables for all API keys',
+                            why: 'Never hardcode secrets; environment variables are the standard for secure credential management',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'env-example',
+                            task: 'Create .env.example with dummy values',
+                            why: 'Documents what env vars are needed without exposing actual values',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'api-validation',
+                            task: 'Validate and sanitize user inputs before API calls',
+                            why: 'Prevents injection attacks and malformed requests that could crash your service',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'rate-limit',
+                            task: 'Implement API rate limiting',
+                            why: 'Protects against abuse and ensures fair resource usage',
+                            difficulty: 'hard'
+                        }
+                    ]
+                },
+                error_handling: {
+                    name: '⚠️ Error Handling',
+                    icon: '⚠️',
+                    items: [
+                        {
+                            id: 'try-except',
+                            task: 'Wrap API calls in try/except blocks',
+                            why: 'Catches network failures, timeouts, and API errors without crashing the app',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'logging',
+                            task: 'Add comprehensive logging (info, warning, error levels)',
+                            why: 'Logs help debug issues in production and understand user behavior',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'graceful-degradation',
+                            task: 'Implement graceful degradation (fallback responses)',
+                            why: 'If a component fails, return a helpful message instead of crashing',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'error-messages',
+                            task: 'Return user-friendly error messages (not stack traces)',
+                            why: 'Users should understand what went wrong; stack traces expose system internals',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'monitoring',
+                            task: 'Set up error tracking (Sentry, DataDog, etc.)',
+                            why: 'Automated alerts and dashboards notify you of production errors immediately',
+                            difficulty: 'hard'
+                        }
+                    ]
+                },
+                performance: {
+                    name: '⚡ Performance',
+                    icon: '⚡',
+                    items: [
+                        {
+                            id: 'caching',
+                            task: 'Cache embedding and retrieval results',
+                            why: 'Avoids redundant API calls; 80% of queries are similar variants',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'lazy-load',
+                            task: 'Lazy load heavy models (embeddings, LLM) on first use',
+                            why: 'Speeds up app startup; models load only when needed',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'batch-processing',
+                            task: 'Batch similar requests for API calls',
+                            why: 'Reduces API overhead and improves throughput for high-traffic scenarios',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'response-time',
+                            task: 'Monitor and log response times for each component',
+                            why: 'Identify bottlenecks (slow retriever? slow LLM?) and optimize',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'async-io',
+                            task: 'Use async/await for I/O operations',
+                            why: 'Non-blocking I/O allows your app to handle multiple requests concurrently',
+                            difficulty: 'hard'
+                        }
+                    ]
+                },
+                code_quality: {
+                    name: '📝 Code Quality',
+                    icon: '📝',
+                    items: [
+                        {
+                            id: 'requirements',
+                            task: 'Maintain requirements.txt with pinned versions',
+                            why: 'Ensures reproducible environments; prevents breaking changes from dependency updates',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'readme',
+                            task: 'Write comprehensive README with setup instructions',
+                            why: 'Others (and future you) can set up and run your project quickly',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'docstrings',
+                            task: 'Add docstrings to all functions',
+                            why: 'Documents what each function does; essential for maintainability',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'type-hints',
+                            task: 'Use type hints (Python 3.6+)',
+                            why: 'Helps catch bugs early with static type checking (mypy)',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'tests',
+                            task: 'Write unit and integration tests',
+                            why: 'Tests catch regressions and give confidence for refactoring',
+                            difficulty: 'hard'
+                        }
+                    ]
+                },
+                deployment: {
+                    name: '🚀 Deployment',
+                    icon: '🚀',
+                    items: [
+                        {
+                            id: 'docker-basics',
+                            task: 'Create a Dockerfile (multi-stage build)',
+                            why: 'Containers ensure "works on my machine" everywhere (dev, staging, prod)',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'docker-compose',
+                            task: 'Use docker-compose for local dev with all services',
+                            why: 'Simulates production locally; catch environment issues early',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'streamlit-cloud',
+                            task: 'Deploy to Streamlit Cloud or similar PaaS',
+                            why: 'Zero-config deployment; great for demos and MVPs',
+                            difficulty: 'easy'
+                        },
+                        {
+                            id: 'env-parity',
+                            task: 'Ensure parity between dev, staging, and production',
+                            why: 'Prevents "works in dev but not prod" surprises',
+                            difficulty: 'medium'
+                        },
+                        {
+                            id: 'ci-cd',
+                            task: 'Set up CI/CD pipeline (GitHub Actions, GitLab CI)',
+                            why: 'Automated testing and deployment on every push; catches issues early',
+                            difficulty: 'hard'
+                        }
+                    ]
+                }
+            };
+
+            const toggleItem = (id) => {
+                const newChecked = new Set(checkedItems);
+                if (newChecked.has(id)) {
+                    newChecked.delete(id);
+                } else {
+                    newChecked.add(id);
+                }
+                setCheckedItems(newChecked);
+            };
+
+            const totalItems = Object.values(categories).reduce((sum, cat) => sum + cat.items.length, 0);
+            const completionPercentage = (checkedItems.size / totalItems) * 100;
+
+            const difficultyColor = {
+                easy: 'text-green-600',
+                medium: 'text-orange-600',
+                hard: 'text-red-600'
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-dark-navy mb-2">Production Readiness Checklist</h2>
+                        <p className="text-gray-600 mb-4">Track your progress toward a production-ready Smart Study Assistant</p>
+
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-dark-navy">Production Readiness Score</span>
+                                <span className="text-lg font-bold text-teal">{Math.round(completionPercentage)}%</span>
+                            </div>
+                            <div className="progress-bar" style={{ width: '100%' }}>
+                                <div
+                                    style={{
+                                        width: `${completionPercentage}%`,
+                                        height: '100%',
+                                        transition: 'width 0.3s ease'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4">
+                        {Object.entries(categories).map(([categoryKey, category]) => (
+                            <div key={categoryKey} className="bg-white rounded-lg p-4 border border-teal border-opacity-20">
+                                <h3 className="font-bold text-lg text-dark-navy mb-4">{category.icon} {category.name}</h3>
+                                <div className="space-y-3">
+                                    {category.items.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className={`checklist-item p-3 rounded flex items-start gap-3 ${
+                                                checkedItems.has(item.id) ? 'checked' : ''
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={checkedItems.has(item.id)}
+                                                onChange={() => toggleItem(item.id)}
+                                                className="mt-1 cursor-pointer"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className={`font-semibold text-dark-navy text-sm ${checkedItems.has(item.id) ? 'line-through text-gray-500' : ''}`}>
+                                                        {item.task}
+                                                    </p>
+                                                    <span className={`text-xs px-2 py-1 rounded font-semibold ${difficultyColor[item.difficulty]}`}>
+                                                        {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
+                                                    </span>
+                                                </div>
+                                                <div className="tooltip-trigger inline-block mt-1">
+                                                    <span className="text-xs text-gray-500 cursor-help">ℹ️ Why it matters</span>
+                                                    <div className="tooltip absolute z-10 mt-1 p-3 bg-dark-navy text-white text-xs rounded-lg w-56 shadow-lg">
+                                                        {item.why}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-teal bg-opacity-10 border border-teal border-opacity-30 p-4 rounded-lg">
+                        <p className="text-sm font-semibold text-teal mb-2">✨ Pro Tip</p>
+                        <p className="text-sm text-dark-navy">
+                            Start with <strong>easy</strong> items (gitignore, env vars, logging). They have the highest impact-to-effort ratio.
+                            As your project grows, tackle <strong>medium</strong> and <strong>hard</strong> items. A 70%+ score makes your project
+                            deployable; 90%+ makes it production-ready.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ========================
+        // TAB 4: Interview Simulator
+        // ========================
+        function InterviewSimulator() {
+            const [currentIdx, setCurrentIdx] = useState(0);
+            const [flipped, setFlipped] = useState(false);
+            const [timerMode, setTimerMode] = useState(false);
+            const [shuffled, setShuffled] = useState(false);
+
+            const questions = [
+                // System Design (5)
+                {
+                    category: 'System Design',
+                    difficulty: 'Mid',
+                    question: 'Design a retrieval-augmented generation (RAG) system from scratch. What components would you include and why?',
+                    answer: `Key components of a RAG system:
+
+1. **Document Loader** (loader.py): Ingest PDFs, docs, notes into memory or disk
+2. **Embeddings** (embeddings.py): Convert text to vectors using a pre-trained model (OpenAI, Hugging Face, etc.)
+3. **Vector Database** (ChromaDB): Store embeddings for fast similarity search (alternative: Pinecone, Weaviate)
+4. **Retriever** (retriever.py): Query the DB, find top-K similar docs based on query embedding
+5. **LLM** (llm.py): Generate response using the retrieved context
+6. **Router** (router.py): Classify incoming query to route to the right retriever/prompt
+7. **Evaluator** (evaluator.py): Score response quality and refine if needed
+8. **Prompt Template** (prompt_template.py): Combine context + query into a structured prompt
+
+Trade-offs: dense vs. sparse retrieval, embedding model size, vector DB latency, LLM cost`
+                },
+                {
+                    category: 'System Design',
+                    difficulty: 'Senior',
+                    question: 'How would you scale the Smart Study Assistant to handle 1M concurrent users? What bottlenecks would you anticipate?',
+                    answer: `Scaling challenges and solutions:
+
+**Bottleneck 1: Vector Database**
+- Problem: Single ChromaDB instance can't handle 1M QPS
+- Solution: Partition by domain (math, history, science), use managed service (Pinecone, Milvus cluster)
+
+**Bottleneck 2: LLM API Calls**
+- Problem: Rate limits, high latency
+- Solution: Caching layer (Redis), batching requests, fallback to smaller model
+
+**Bottleneck 3: Embedding Model**
+- Problem: Running embeddings synchronously blocks requests
+- Solution: Pre-embed all documents offline, cache embeddings, use GPU instance for inference
+
+**Architecture**:
+- Load balancer → multiple instances of app (horizontal scaling)
+- Shared Redis cache for embeddings and recent responses
+- Async task queue (Celery, Bull) for non-blocking operations
+- Use streaming LLM responses to reduce latency perception
+- Circuit breaker pattern to degrade gracefully if dependencies fail`
+                },
+                {
+                    category: 'System Design',
+                    difficulty: 'Junior',
+                    question: 'Explain what your Smart Study Assistant does in 2 minutes as if talking to a non-technical person.',
+                    answer: `Simple explanation:
+
+"Our Smart Study Assistant is like having a personal tutor available 24/7. Here's how it works:
+
+1. **You ask a question**: "Explain photosynthesis"
+2. **It finds your notes**: The system searches through all your study notes to find the most relevant ones
+3. **It generates an answer**: Using AI, it combines your notes with its general knowledge to create a clear explanation
+4. **It checks itself**: Before giving you the answer, it reviews it for accuracy and clarity
+5. **You get a response**: A well-structured answer tailored to YOUR notes and learning style
+
+It's like Ctrl+F for your brain—finding exactly what you need, explained clearly."`
+                },
+                {
+                    category: 'System Design',
+                    difficulty: 'Mid',
+                    question: 'Your Smart Study Assistant returns incorrect or irrelevant answers to some queries. How would you debug this?',
+                    answer: `Debugging strategy:
+
+**Step 1: Identify the Problem Component**
+- Is it retrieval (wrong docs fetched)? Or generation (LLM generates wrong answer)?
+- Log each stage: query → embedding → retrieval → generation
+
+**Step 2: Retrieval Issues**
+- Check embedding quality: similar queries should have similar embeddings
+- Verify ChromaDB is returning relevant chunks (low similarity score = bad retrieval)
+- Try different embedding model or tune similarity threshold
+- Check data quality: are notes well-formatted? Spelling errors?
+
+**Step 3: Generation Issues**
+- Review the prompt template: is context injected correctly?
+- Check LLM output directly (before evaluator)
+- Test with different temperature/top_p settings
+- Use a stronger model (GPT-4 instead of GPT-3.5)
+
+**Step 4: Evaluator Issues**
+- Is evaluator filtering out good responses?
+- Adjust scoring threshold; review examples
+
+**Tools to use**: Print/log intermediate values, unit tests for each component, A/B test models`
+                },
+                {
+                    category: 'System Design',
+                    difficulty: 'Hard',
+                    question: 'How would you ensure your Smart Study Assistant outputs are factually correct and cites sources from the user\'s notes?',
+                    answer: `Solutions for accuracy and source attribution:
+
+**1. Retrieval Accuracy**
+- Use the Evaluator to score how relevant each retrieved chunk is
+- Re-rank results by relevance score, only use top-1 or top-2
+- Implement a minimum relevance threshold
+
+**2. Citation Tracking**
+- When retrieving chunks, attach metadata: (document_name, page_number, line_number)
+- Pass this metadata through the pipeline
+- Modify prompt template: "Cite your sources as [Doc: filename, Page: N]"
+
+**3. Factual Verification**
+- Use evaluator to check: does answer contradict source material?
+- Have evaluator prompt: "Is this answer supported by the context?"
+- Score based on alignment with source material
+
+**4. Hallucination Prevention**
+- Instruct LLM in prompt: "ONLY use information from the provided notes. If unsure, say 'This information is not in your notes.'"
+- Disable generation beyond the context (set max_tokens conservatively)
+- Use a smaller, more grounded model if applicable
+
+**5. Human Review Loop**
+- Flag low-confidence answers for manual review
+- Implement feedback mechanism: user marks incorrect answers
+- Retrain/fine-tune on feedback
+
+Example prompt:
+"Answer the question using ONLY the provided notes. At the end, cite the source as [Note: filename].
+If the answer is not in the notes, say: 'I don't have this information in your notes.'"`
+                },
+                // Technical Deep-Dive (5)
+                {
+                    category: 'Technical Deep-Dive',
+                    difficulty: 'Junior',
+                    question: 'What is an embedding and why do we use them in the Smart Study Assistant?',
+                    answer: `**What is an embedding?**
+An embedding is a vector (a list of numbers) that represents text in a numerical way.
+
+Example: "Photosynthesis" might be represented as [0.2, -0.5, 0.8, 0.1, ...] (hundreds or thousands of numbers).
+
+**Why embeddings?**
+1. **Similarity search**: Two similar texts have similar embeddings (close numbers). We can compute cosine similarity to find relevant documents quickly.
+2. **Machine learning**: Embeddings are the language of neural networks. Models understand numbers better than text.
+3. **Efficiency**: Searching 10,000 embeddings (vector search) is much faster than searching raw text (keyword search).
+
+**In Smart Study Assistant**:
+- User query "Explain photosynthesis" → embedding
+- Search ChromaDB: find embeddings most similar to query embedding
+- Return documents with high similarity
+- These are the most relevant notes to include in the LLM prompt`
+                },
+                {
+                    category: 'Technical Deep-Dive',
+                    difficulty: 'Mid',
+                    question: 'Explain the difference between sparse and dense retrieval. Which does your Smart Study Assistant use?',
+                    answer: `**Sparse Retrieval (BM25, TF-IDF)**
+- Matches exact words: documents containing "photosynthesis" + "plants"
+- Fast and interpretable: you can see which words matched
+- Works well for keyword queries
+- Poor for semantic understanding: "plant food production" ≠ "photosynthesis" even though they're related
+
+**Dense Retrieval (Embeddings)**
+- Uses semantic meaning: understands that "plant makes food from sunlight" ≈ "photosynthesis"
+- Better for natural language queries
+- Requires embedding model (slower upfront, but cached)
+- Works across languages and paraphrasing
+
+**Smart Study Assistant uses Dense Retrieval**:
+- Query "Explain how plants get energy" → embedding
+- Finds docs about photosynthesis, even if keyword doesn't match
+- Better for student queries (natural language, not keyword-based)
+
+**Hybrid Approach** (if scaling):
+- Use sparse retrieval first (fast filter)
+- Then dense retrieval on top results (accuracy)
+- Combines speed of BM25 with accuracy of embeddings`
+                },
+                {
+                    category: 'Technical Deep-Dive',
+                    difficulty: 'Hard',
+                    question: 'Your Smart Study Assistant uses ChromaDB for vector search. What are the trade-offs of ChromaDB vs. Pinecone vs. building a custom retriever?',
+                    answer: `**ChromaDB**
+Pros:
+- Lightweight, runs locally (no external dependency)
+- Good for prototyping and learning
+- Built-in persistence
+- Zero cost
+Cons:
+- Not designed for massive scale (1M+ embeddings)
+- No built-in partitioning or sharding
+- Limited query filtering
+
+**Pinecone**
+Pros:
+- Fully managed, handles scaling automatically
+- Advanced features (metadata filtering, hybrid search)
+- SLA and uptime guarantees
+- Global distribution
+Cons:
+- Monthly cost ($0.15 per 100K vectors minimum)
+- Vendor lock-in
+- Latency from API calls
+
+**Custom Retriever (PostgreSQL + pgvector)**
+Pros:
+- Full control, no vendor lock-in
+- Can customize indexing strategy
+- Cost-effective at scale
+Cons:
+- Requires DevOps knowledge
+- Responsible for scaling, backups
+- More complex to maintain
+
+**For Smart Study Assistant**:
+- **MVP/Demo**: ChromaDB (easiest)
+- **Scaling to 100K+ users**: Migrate to Pinecone or self-hosted solution
+- **Production 1M+ scale**: Multi-node Milvus or Elasticsearch cluster`
+                },
+                {
+                    category: 'Technical Deep-Dive',
+                    difficulty: 'Mid',
+                    question: 'How would you implement the router (intent classification) in your Smart Study Assistant? What model/approach would you use?',
+                    answer: `**Router Purpose**:
+Classify incoming query intent (explanation, quiz, summary, comparison, etc.) to route to appropriate retrieval strategy and prompt.
+
+**Approaches**:
+
+1. **Rule-Based (Simplest)**
+   - Pattern matching with keywords
+   - "quiz" in query → quiz intent
+   - Fast, interpretable, no ML needed
+   - Problem: rigid, doesn't handle variations
+
+2. **Fine-tuned Classifier (Best for BIA Project)**
+   - Train a small BERT model on labeled examples of each intent
+   - Use: transformers library + Hugging Face
+   - Fast inference, ~95% accuracy
+   - Code: loader.py → router.py pipeline
+
+3. **Few-Shot Prompting (Easy, Uses LLM)**
+   - Prompt GPT: "Classify this as: explanation/quiz/summary"
+   - Costs money per query (slower)
+   - Great accuracy but overkill for simple classification
+
+**Implementation for Smart Study Assistant**:
+```python
+# router.py
+from transformers import pipeline
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+def route_query(query):
+    intents = ["explanation", "quiz", "summary", "comparison"]
+    result = classifier(query, intents)
+    top_intent = result["labels"][0]
+    return ROUTING_MAP[top_intent]
+```
+
+Trade-off: fine-tuning takes time but gives best accuracy/cost ratio. Few-shot is fastest to implement.`
+                },
+                {
+                    category: 'Technical Deep-Dive',
+                    difficulty: 'Senior',
+                    question: 'Describe the most critical failure mode in your Smart Study Assistant and how you would mitigate it.',
+                    answer: `**Critical Failure Mode: LLM Hallucination**
+
+**What it is**: LLM generates plausible-sounding but factually incorrect information not in the source notes.
+
+Example:
+- User: "What did Aristotle say about photosynthesis?"
+- Retrieved notes: (empty—Aristotle predates photosynthesis science)
+- System (BAD): "Aristotle believed photosynthesis was caused by celestial influence..." (hallucinated)
+- System (GOOD): "Your notes don't contain information about Aristotle's views on photosynthesis."
+
+**Impact**: Users trust the system and memorize false information for exams. Catastrophic for educational app.
+
+**Mitigation Strategies**:
+
+1. **Retrieval Quality Gate**
+   - If similarity score < 0.6, don't generate. Return: "Not found in your notes"
+
+2. **Strict Prompt Engineering**
+   - System prompt: "ONLY generate answers using the provided context. If context is insufficient, respond: 'This information is not available.'"
+   - Few-shot examples in prompt showing desired behavior
+
+3. **Evaluator as Fact-Check**
+   - Evaluator scores: Does answer align with source material?
+   - If score < threshold, request refined answer
+   - Code: evaluator.py checks against original context
+
+4. **Source Attribution**
+   - Always include in response: [Source: document_name, section]
+   - Users can verify; errors are caught quickly
+
+5. **Confidence Scoring**
+   - Track similarity scores, output a confidence level
+   - "High confidence (87%)" vs "Low confidence (42%)"
+
+6. **Human Review Loop**
+   - Allow users to flag incorrect answers
+   - Periodically review flagged responses
+   - Update system based on feedback
+
+Most effective: combination of retrieval filtering + strict prompt + evaluator scoring`
+                },
+                // Behavioral (5)
+                {
+                    category: 'Behavioral',
+                    difficulty: 'Junior',
+                    question: 'Tell me about a project you built or contributed to. What was challenging and how did you overcome it?',
+                    answer: `**Context**: Refer to Smart Study Assistant project.
+
+**Good Answer Structure**:
+1. **Project Overview** (30 sec)
+   - "Built a Smart Study Assistant for students—a RAG system that retrieves relevant notes and generates study explanations"
+   - Scope: 10 Python files, used ChromaDB, OpenAI API
+
+2. **Your Role** (15 sec)
+   - "Owned the retriever.py module and helped design the overall data flow"
+   - Be specific, not vague
+
+3. **Challenge** (45 sec)
+   - "Initial version had poor retrieval quality—it was returning irrelevant notes"
+   - Specific, concrete challenge
+
+4. **Solution** (1 min)
+   - "Debugged by logging similarity scores; found embeddings were low quality"
+   - "Switched embedding model; tuned ChromaDB parameters; result: retrieval accuracy improved from 60% to 89%"
+   - Actions taken and measurable outcome
+
+5. **Reflection** (30 sec)
+   - "Learned the importance of evaluating each component independently before blaming the LLM"
+   - "Next time, would implement logging from day one"
+
+**What interviewers want**: Problem-solving ability, debugging skills, ownership mindset`
+                },
+                {
+                    category: 'Behavioral',
+                    difficulty: 'Mid',
+                    question: 'Describe a time you had to learn a new technology quickly. How did you approach it?',
+                    answer: `**Real Example from Smart Study Assistant Project**:
+
+**Situation**:
+"We had to integrate ChromaDB for vector search, but I'd never used it before. Deadline was 1 week."
+
+**Approach** (What interviewers want to see):
+1. **Read Official Docs** (2-3 hours)
+   - ChromaDB tutorial, API reference
+   - Understand core concepts: collections, embeddings, queries
+
+2. **Hands-On Experimentation** (4-5 hours)
+   - Write minimal example: load docs, query, measure latency
+   - Try different configurations; measure retrieval quality
+   - Don't just read—code it
+
+3. **Integrate with Existing Code** (2-3 days)
+   - Adapt loader.py to populate ChromaDB
+   - Connect to retriever.py
+   - Test integration with real student notes
+
+4. **Optimize Based on Results** (1-2 days)
+   - Measure: retrieval speed, accuracy
+   - Adjust embedding model, similarity threshold
+   - Document learnings
+
+5. **Knowledge Transfer** (2-3 hours)
+   - Documented setup in README
+   - Helped teammates understand ChromaDB architecture
+
+**Result**:
+- Deployed ChromaDB on schedule
+- 89% retrieval accuracy
+- Teammates could maintain code
+
+**Lessons**:
+- Combine learning with doing
+- Build iteratively, test early
+- Document so knowledge doesn't die with you
+
+**Why this matters to interviewer**: Shows self-direction, hustle, and ability to execute under pressure.`
+                },
+                {
+                    category: 'Behavioral',
+                    difficulty: 'Hard',
+                    question: 'Describe a time you disagreed with a teammate or manager. How did you handle it?',
+                    answer: `**Real Example**:
+
+**Situation**:
+"Manager wanted to use GPT-4 for response generation (cost: $0.03 per query). I advocated for GPT-3.5-turbo ($0.001 per query) with a better evaluator."
+
+**Disagreement**:
+- Manager: "GPT-4 will give better quality, worth the cost"
+- Me: "At 1000 daily users, GPT-4 costs $30/day. We can get same quality with cheaper model + smarter filtering"
+
+**How I Handled It** (What interviewers want to see):
+
+1. **Listened first**
+   - Let manager explain their reasoning
+   - Understood: quality concerns for user satisfaction
+
+2. **Brought data**
+   - Ran comparison: GPT-3.5-turbo vs GPT-4 on 50 test queries
+   - Measured: quality (BLEU score), cost, latency
+   - Result: 2% quality difference, 30x cost reduction
+
+3. **Proposed compromise**
+   - "Use GPT-3.5-turbo for 90% of queries (fast path)"
+   - "Use GPT-4 for complex questions only (slow path, few requests)"
+   - Cost: $5/day instead of $30/day; quality preserved
+
+4. **Got buy-in**
+   - Presented findings to manager
+   - Showed that data supported my position
+   - Manager agreed; we implemented the solution
+
+5. **Followed through**
+   - Implemented both models
+   - Monitored user satisfaction metrics
+   - Proved solution worked as expected
+
+**Why this matters**:
+- Shows maturity: disagree respectfully, not emotionally
+- Brings data, not just opinions
+- Seeks win-win solutions
+- Takes ownership of outcome
+
+**Don't say**: "I was right and the manager was wrong"
+**Do say**: "We had different perspectives, so I gathered data to help us make the best decision for the project"`
+                },
+                {
+                    category: 'Behavioral',
+                    difficulty: 'Mid',
+                    question: 'What are your strengths and weaknesses as an engineer?',
+                    answer: `**Structure**: Strength + proof, Weakness + mitigation
+
+**Strength 1: Debugging & Problem-Solving**
+- Proof: "When Smart Study Assistant had poor retrieval quality, I systematically tested each component—embeddings, ChromaDB config, data quality—and found the issue: embedding model was misaligned with data"
+- Outcome: Improved retrieval from 60% to 89% accuracy
+
+**Strength 2: Ownership Mentality**
+- Proof: "Took end-to-end ownership of the retriever.py module. Made decisions about chunking strategy, similarity thresholds, and caching—didn't wait for approval"
+- Result: Faster iteration, learned more
+
+**Weakness 1: Perfectionism (Reframed)**
+- What it sounds like: "I care too much about code quality"
+- Reality: "I used to spend 3 days optimizing code that would save 50ms per query. Realized diminishing returns."
+- Mitigation: "Now I use the 80/20 rule—ship working code first, optimize high-impact bottlenecks second"
+- Example: First version of retriever was functional but inelegant. Got feedback from team, optimized critical path only.
+
+**Weakness 2: Depth Over Breadth (Reframed)**
+- What it sounds like: "I like to go deep into one thing, sometimes at the expense of learning new things"
+- Reality: "Got very deep into ChromaDB configuration but didn't explore Pinecone"
+- Mitigation: "Now I use structured learning: 80% depth on core system, 20% breadth on adjacent tools. This forces me to stay aware of alternatives."
+
+**Why this approach works**:
+- Strengths are specific and proven (not vague)
+- Weaknesses are real (not fake) but mitigated
+- Shows self-awareness and growth mindset`
+                },
+                {
+                    category: 'Behavioral',
+                    difficulty: 'Senior',
+                    question: 'How do you stay current with technology? What are you learning right now?',
+                    answer: `**Answer Structure**: Active learning + concrete projects
+
+**Current Learning** (Related to Smart Study Assistant):
+
+1. **LLM Fine-Tuning**
+   - Currently reading: LoRA (Low-Rank Adaptation) research papers
+   - Goal: Fine-tune smaller models (Mistral, Llama 2) for study domain
+   - Motivation: Cost reduction + domain-specific accuracy
+
+2. **Production ML Systems**
+   - Reading: "Designing Machine Learning Systems" by Chip Huyen
+   - Applying to Smart Study Assistant: Implementing feature store, monitoring, retraining pipeline
+
+3. **Open-Source Contribution**
+   - Contributing to LangChain project (RAG framework)
+   - Why: Learn from maintainers, stay exposed to best practices
+
+**How I Learn**:
+1. **Structured** (40%): Courses, papers, books
+2. **Project-Based** (50%): Build things with new tech, measure results
+3. **Community** (10%): Tech talks, GitHub discussions, peer learning
+
+**Concrete Example from Smart Study Assistant**:
+- Wanted to learn about prompt optimization
+- Implemented prompt versioning: tested 5 different prompts
+- Measured: accuracy, latency, cost
+- Best performer became default; others were archived
+- Learned: systematic testing > guessing
+
+**Why this matters to interviewers**:
+- Shows curiosity and growth mindset
+- Learning is project-driven (not just reading for reading's sake)
+- Can apply learnings to company problems
+- Staying relevant in fast-moving field
+
+**Avoid**:
+- Generic: "I like learning new technologies"
+- Passive: "I watch YouTube tutorials"
+- Unfocused: Jumping between 10 different things
+
+**Do**:
+- Specific technologies and why they matter
+- How you're applying learning to real problems`
+                }
+            ];
+
+            const orderedQuestions = shuffled ? [...questions].sort(() => Math.random() - 0.5) : questions;
+            const currentQuestion = orderedQuestions[currentIdx];
+
+            useEffect(() => {
+                setFlipped(false);
+                if (timerMode) {
+                    const timer = setTimeout(() => setFlipped(true), 30000);
+                    return () => clearTimeout(timer);
+                }
+            }, [currentIdx, timerMode]);
+
+            const nextQuestion = () => {
+                if (currentIdx < orderedQuestions.length - 1) {
+                    setCurrentIdx(currentIdx + 1);
+                }
+            };
+
+            const prevQuestion = () => {
+                if (currentIdx > 0) {
+                    setCurrentIdx(currentIdx - 1);
+                }
+            };
+
+            const shuffle = () => {
+                setShuffled(!shuffled);
+                setCurrentIdx(0);
+                setFlipped(false);
+            };
+
+            const difficultyColor = {
+                'Junior': 'bg-green-100 text-green-800',
+                'Mid': 'bg-blue-100 text-blue-800',
+                'Senior': 'bg-red-100 text-red-800'
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-dark-navy mb-2">Interview Simulator</h2>
+                            <p className="text-gray-600">Practice interview questions for the Smart Study Assistant project</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={shuffle}
+                                className="px-4 py-2 bg-white border border-teal text-teal rounded-lg hover:bg-teal hover:text-white transition"
+                            >
+                                🔀 Shuffle
+                            </button>
+                            <button
+                                onClick={() => setTimerMode(!timerMode)}
+                                className={`px-4 py-2 rounded-lg transition ${
+                                    timerMode
+                                        ? 'bg-teal text-white'
+                                        : 'bg-white border border-teal text-teal hover:bg-teal hover:text-white'
+                                }`}
+                            >
+                                ⏱️ {timerMode ? 'Timer On' : 'Timer Off'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-6 border border-teal border-opacity-20">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${difficultyColor[currentQuestion.difficulty]}`}>
+                                    {currentQuestion.difficulty}
+                                </span>
+                                <span className="px-3 py-1 bg-teal bg-opacity-20 text-teal rounded-full text-sm font-semibold">
+                                    {currentQuestion.category}
+                                </span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-600">
+                                Question {currentIdx + 1} of {orderedQuestions.length}
+                            </span>
+                        </div>
+
+                        <div
+                            className="flashcard min-h-96 cursor-pointer"
+                            onClick={() => setFlipped(!flipped)}
+                        >
+                            <div className={`flashcard-inner h-full ${flipped ? 'flipped' : ''}`}>
+                                {/* Front */}
+                                <div className="flashcard-front bg-gradient-to-br from-teal to-light-teal text-white p-8 rounded-lg flex items-center justify-center text-center min-h-96">
+                                    <div>
+                                        <p className="text-sm opacity-75 mb-4">QUESTION</p>
+                                        <p className="text-xl font-semibold leading-relaxed">{currentQuestion.question}</p>
+                                        <p className="text-sm opacity-75 mt-8">Click to reveal answer</p>
+                                    </div>
+                                </div>
+
+                                {/* Back */}
+                                <div className="flashcard-back bg-gray-50 p-8 rounded-lg overflow-auto min-h-96 border border-teal">
+                                    <div className="prose prose-sm max-w-none">
+                                        <div className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
+                                            {currentQuestion.answer}
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-6">Click to hide answer</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex items-center justify-between">
+                            <button
+                                onClick={prevQuestion}
+                                disabled={currentIdx === 0}
+                                className="px-4 py-2 bg-white border border-teal text-teal rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-teal hover:text-white transition"
+                            >
+                                ← Previous
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                {Array.from({ length: orderedQuestions.length }).map((_, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => {
+                                            setCurrentIdx(idx);
+                                            setFlipped(false);
+                                        }}
+                                        className={`w-3 h-3 rounded-full transition ${
+                                            idx === currentIdx ? 'bg-teal w-8' : 'bg-gray-300'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={nextQuestion}
+                                disabled={currentIdx === orderedQuestions.length - 1}
+                                className="px-4 py-2 bg-teal text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-light-teal transition"
+                            >
+                                Next →
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {['System Design', 'Technical Deep-Dive', 'Behavioral'].map((cat) => {
+                            const count = orderedQuestions.filter(q => q.category === cat).length;
+                            return (
+                                <div key={cat} className="bg-white p-4 rounded-lg border border-teal border-opacity-20">
+                                    <p className="font-semibold text-dark-navy text-sm">{cat}</p>
+                                    <p className="text-2xl font-bold text-teal mt-2">{count}</p>
+                                    <p className="text-xs text-gray-600 mt-1">questions</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // ========================
+        // Main App Component
+        // ========================
+        function App() {
+            const [activeTab, setActiveTab] = useState('data-flow');
+
+            const tabs = [
+                { id: 'data-flow', label: '1. Data Flow Visualizer', icon: '🔄' },
+                { id: 'use-case', label: '2. Use Case Mapper', icon: '🗺️' },
+                { id: 'checklist', label: '3. Production Checklist', icon: '✅' },
+                { id: 'interview', label: '4. Interview Simulator', icon: '🎤' }
+            ];
+
+            return (
+                <div style={{ backgroundColor: 'var(--bg)' }} className="min-h-screen">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-dark-navy to-teal text-white py-8">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <h1 className="text-4xl font-bold mb-2">Architecture, Production & Interview Prep</h1>
+                            <p className="text-teal-100">BIA Smart Study Assistant – Beginner Level</p>
+                        </div>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <div className="flex gap-8 overflow-x-auto">
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`py-4 px-2 font-semibold border-b-4 transition whitespace-nowrap ${
+                                            activeTab === tab.id
+                                                ? 'tab-active'
+                                                : 'border-b-4 border-transparent text-gray-600 hover:text-dark-navy'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        {activeTab === 'data-flow' && <DataFlowVisualizer />}
+                        {activeTab === 'use-case' && <UseCaseMapper />}
+                        {activeTab === 'checklist' && <ProductionChecklist />}
+                        {activeTab === 'interview' && <InterviewSimulator />}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="bg-dark-navy text-white py-8 mt-16">
+                        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-400">
+                            <p>BIA GenAI Course | Smart Study Assistant Project</p>
+                            <p className="mt-2">Created for learning architecture patterns, production best practices, and interview preparation</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

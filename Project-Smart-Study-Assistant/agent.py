@@ -23,13 +23,13 @@ Be encouraging and helpful. Keep explanations clear for beginners."""
 def create_study_agent():
     """Create the study assistant agent."""
     # TODO 19: Initialize the LLM with LLM_MODEL and LLM_TEMPERATURE
-    llm = None  # Replace
+    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=LLM_TEMPERATURE)
 
     # TODO 20: Get all tools from get_all_tools()
-    tools = None  # Replace
+    tools = get_all_tools()
 
-    # TODO 21: Create the agent using create_react_agent(model=llm, tools=tools, prompt=AGENT_PROMPT)
-    agent = None  # Replace
+    # TODO 21: Create the agent using create_react_agent
+    agent = create_react_agent(model=llm, tools=tools, prompt=AGENT_PROMPT)
 
     return agent
 

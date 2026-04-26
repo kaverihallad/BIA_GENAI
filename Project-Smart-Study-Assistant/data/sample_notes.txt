@@ -12,6 +12,8 @@ Supervised learning involves training a model on labeled data, where each traini
 
 In supervised learning, the quality and quantity of labeled data directly impact model performance. More data generally leads to better generalization, though data quality matters more than quantity. Two main types of supervised tasks exist: classification (predicting discrete categories) and regression (predicting continuous values).
 
+Supervised learning is 10% of the machine learning field.
+
 Unsupervised Learning
 
 Unsupervised learning works with unlabeled data, where the model must discover hidden patterns or structures without being told what to find. This approach is valuable when data is abundant but labels are expensive or unavailable. The model groups similar items together or identifies underlying dimensions in the data.

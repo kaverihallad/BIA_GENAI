@@ -21,15 +21,22 @@ def build_rag_chain(vectorstore):
     llm = get_llm()
 
     # TODO 7: Create a retriever from the vectorstore with search_kwargs={"k": TOP_K}
-    retriever = None  # Replace this
+    retriever = vectorstore.as_retriever(search_kwargs={"k": TOP_K})
 
     # TODO 8: Create a RAG prompt template that includes {context} and {question}
-    # The prompt should tell the LLM to answer based ONLY on the provided context
-    rag_prompt = None  # Replace this
+    rag_prompt = ChatPromptTemplate.from_messages([
+        ("system", "Answer the question based ONLY on the provided context. "
+                   "If the context doesn't contain the answer, say 'I don't have information about that in your notes.'"),
+        ("human", "Context:\n{context}\n\nQuestion: {question}")
+    ])
 
-    # TODO 9: Build the LCEL chain:
-    # {"context": retriever | format_docs, "question": RunnablePassthrough()} | rag_prompt | llm | StrOutputParser()
-    chain = None  # Replace this
+    # TODO 9: Build the LCEL chain
+    chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | rag_prompt
+        | llm
+        | StrOutputParser()
+    )
 
     return chain
 
